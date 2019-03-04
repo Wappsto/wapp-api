@@ -1,0 +1,31 @@
+{
+  "name": "wapp-api",
+  "version": "1.0.1",
+  "description": "Helper functions to speed up wapp development process.",
+  "main": "main.js",
+  "license": "Apache-2.0",
+  "author": "Seluxit A/S",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wappsto/wapp-api.git"
+  },
+  "keywords": [
+    "wappsto",
+    "wapp",
+    "wapp-api",
+    "iot",
+    "api"
+  ],
+  "author": {
+    "name": "Seluxit A/S",
+    "email": "developer@wappsto.com",
+    "url": "https://wappsto.com"
+  },
+  "bugs": {
+    "url": "https://github.com/Wappsto/wapp-api/issues"
+  },
+  "dependencies": {
+    "node-fetch": "2.3.0",
+    "ws": "6.1.2"
+  }
+}
