@@ -61,7 +61,7 @@ const checkAndSendTrace = function(req = {}, options = {}) {
             path = path.split('?')[1] || '';
         }
         method = options.method || 'GET';
-    } else if (req.constructor === Object) {
+    } else if(Object.prototype.toString.call(req) === "[object Object]"){
         path = req.path;
         method = req.method || 'GET';
         options = req;
@@ -70,6 +70,9 @@ const checkAndSendTrace = function(req = {}, options = {}) {
         nodeName = tracer.params.name + "_" + method + '_' + path;
     } else {
         nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
+    }
+    if(!path){
+      return;
     }
     if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
         // Removing trace_parent from path

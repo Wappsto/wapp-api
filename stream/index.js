@@ -136,7 +136,7 @@ class WappstoStream extends EventEmitter {
     }
 
     _handleMessage(message, traceId) {
-        let id, model, options, event = message.event;
+        let id, models, options, event = message.event;
         if (traceId) {
             options = {
                 trace: traceId
@@ -151,11 +151,13 @@ class WappstoStream extends EventEmitter {
                         id = message.path.split("/");
                         let last = id[id.length - 1];
                         id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
-                        model = this.models[id];
-                        if (model) {
-                            let type = message.meta_object.type;
+                        models = this.models[id];
+                        if (models) {
+                          let type = message.meta_object.type;
+                          models.forEach((model) => {
                             let newModel = model.get(type).add(message[type], options);
                             this.addModel(newModel);
+                          });
                         }
                     }
                 }
@@ -165,10 +167,12 @@ class WappstoStream extends EventEmitter {
                 break;
             case "delete":
                 id = message.meta_object.id;
-                model = this.models[id];
-                if (model) {
-                    model.emit("destroy", options);
-                    this.removeModel(model);
+                models = this.models[id];
+                if (models) {
+                    models.forEach((model) => {
+                      model.emit("destroy", model, options);
+                      this.removeModel(model);
+                    });
                 }
                 break;
 
@@ -177,10 +181,12 @@ class WappstoStream extends EventEmitter {
 
     _updateModel(message, options) {
         let id = message.meta_object.id;
-        let model = this.models[id];
-        if (model) {
-            model.emit("stream:message", model, message[message.meta_object.type], message);
-            model.set(message[message.meta_object.type], options);
+        let models = this.models[id];
+        if (models) {
+            models.forEach((model) => {
+              model.emit("stream:message", model, message[message.meta_object.type], message);
+              model.set(message[message.meta_object.type], options);
+            });
             return true;
         }
         return false;
@@ -291,7 +297,7 @@ class WappstoStream extends EventEmitter {
                         relatedClass
                     }) => {
                         if (type === Util.type.One) {
-                            func(m.get(key));
+                            temp = [...temp, m.get(key)];
                         } else if (type === Util.type.Many) {
                             temp = [...temp, ...m.get(key).models];
                         }
@@ -305,12 +311,25 @@ class WappstoStream extends EventEmitter {
     _addModelToCache(model) {
         let id = model.get("meta.id");
         if (!this.models.hasOwnProperty(id)) {
-            this.models[id] = model;
+          this.models[id] = [model];
+        } else {
+          if(this.models[id].indexOf(model) === -1){
+            this.models[id].push(model);
+          }
         }
     }
 
     _removeModelFromCache(model) {
-        delete this.models[model.get("meta.id")];
+        let id = model.get("meta.id");
+        if(this.models[id]){
+          let index = this.models[id].indexOf(model);
+          if(index !== -1){
+            this.models[id].splice(index, 1);
+            if(this.models[id].length === 0){
+              delete this.models[id];
+            }
+          }
+        }
     }
 
     _updateSubscriptions(subscription, options) {

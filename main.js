@@ -135,22 +135,31 @@ class Wappsto {
   }
 
   _request(model, defaultRequest, requestOptions, options){
-    if(this.wStream !== null){
-      makeRequest.call(model, defaultRequest, requestOptions, options);
-    } else {
-      this.wStream = false;
-      this.initializeStream({subscription: ["/notification"], full: true}, {
-        success: (wStream) => {
-          this.wStream = wStream;
-          this._addPermissionListener(wStream);
-          makeRequest.call(model, defaultRequest, requestOptions, options);
-        },
-        error: (response) => {
-          this.wStream = null;
-          if(options.error){
-            options.error(response);
-          }
+    if(this.wStreamPromise){
+      this.wStreamPromise.then(() => {
+        makeRequest.call(model, defaultRequest, requestOptions, options);
+      }).catch((response) => {
+        if(options.error){
+          options.error(response);
         }
+      });
+    } else {
+      this.wStreamPromise = new Promise((resolve, reject) => {
+        this.initializeStream({subscription: ["/notification"], full: true}, {
+          success: (wStream) => {
+            this.wStream = wStream;
+            this._addPermissionListener(wStream);
+            resolve(wStream);
+            makeRequest.call(model, defaultRequest, requestOptions, options);
+          },
+          error: (response) => {
+            this.wStreamPromise = null;
+            reject(response);
+            if(options.error){
+              options.error(response);
+            }
+          }
+        });
       });
     }
   }
