@@ -15,19 +15,19 @@ wapp-api follows the Wappsto's Unified Data Model. It provides a possibility to 
 wapp-api can be used in either web browser or in NodeJS environment:
 
 * Browser (client-side usage):
-```
+```html
 <script src="browser/wapp-api.js"></script>
 ```
 This will add the 'Wappsto' class as a global variable under the window object.
 
 * NodeJS (server-side usage):
-```
+```javascript
 const Wappsto = require("wapp-api");
 ```
 
 Once 'Wappsto' class is loaded, you can instantiate it as follows:
 
-```
+```javascript
 var wappsto = new Wappsto();
         
 // or if you want a specific session or environment:
