@@ -146,7 +146,11 @@ class Wappsto {
       });
     } else {
       this.wStreamPromise = new Promise((resolve, reject) => {
-        this.initializeStream({subscription: ["/notification"], full: true}, {
+        this.initializeStream({
+          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
+          subscription: ["/notification"],
+          full: true
+        }, {
           success: (wStream) => {
             this.wStream = wStream;
             this._addPermissionListener(wStream);
@@ -245,6 +249,7 @@ class Wappsto {
 
   initializeStream(streamJSON, options = {}) {
     let models = [];
+    let searchFor = {};
     if(!streamJSON){
       streamJSON = {};
     } else if(streamJSON.constructor === Array){
@@ -265,7 +270,12 @@ class Wappsto {
         subscription: paths
       };
     }
-    this.get('stream', {}, {
+    if(streamJSON.name){
+      searchFor = {
+        name: streamJSON.name
+      }
+    }
+    this.get('stream', searchFor, {
       expand: 1,
       success: (streamCollection) => {
         if (streamCollection.length > 0) {
@@ -1275,7 +1285,7 @@ Stream["_defaults"] = {
 };
 
 Stream[_pickAttributes] = {
-  '2.0': ['meta', 'subscription', 'ignore', 'full']
+  '2.0': ['meta', 'subscription', 'ignore', 'full', 'name']
 };
 
 module.exports = Stream;
@@ -9540,6 +9550,7 @@ class WappstoStream extends EventEmitter {
 
         source.addEventListener('close', function(e) {
             console.log('stream closed: ' + url);
+            clearTimeout(timeout);
             self.emit('close', e);
             reconnect();
         }, false);

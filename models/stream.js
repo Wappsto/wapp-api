@@ -10,7 +10,7 @@ Stream["_defaults"] = {
 };
 
 Stream[_pickAttributes] = {
-  '2.0': ['meta', 'subscription', 'ignore', 'full']
+  '2.0': ['meta', 'subscription', 'ignore', 'full', 'name']
 };
 
 module.exports = Stream;

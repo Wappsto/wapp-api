@@ -122,6 +122,7 @@ class WappstoStream extends EventEmitter {
 
         source.addEventListener('close', function(e) {
             console.log('stream closed: ' + url);
+            clearTimeout(timeout);
             self.emit('close', e);
             reconnect();
         }, false);
