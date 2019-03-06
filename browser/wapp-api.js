@@ -9945,7 +9945,7 @@ module.exports = tracer;
 let baseUrl, session;
 if(typeof window === 'object' && window.document){
     baseUrl = "/services";
-    session = window.sessionID;
+    session = window.sessionStorage.getItem("sessionID");
 } else {
     baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
     session = process.env.sessionID;
