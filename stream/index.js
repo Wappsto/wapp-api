@@ -216,7 +216,7 @@ class WappstoStream extends EventEmitter {
             console.error("stream model is not found, cannot update subscriptions");
             return;
         }
-        if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
+        if(arr.constructor !== Array && !(arr instanceof Collection)){
             arr = [arr];
         }
         let subscriptions = [];

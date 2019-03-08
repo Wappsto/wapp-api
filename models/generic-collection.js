@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
+let Request;
 let Generic;
 
 const _collections = Symbol.for("generic-class-collections");
@@ -9,17 +10,28 @@ const _util = Symbol.for("generic-util");
 const _class = "defaultModel";
 const _className = Symbol.for("generic-collection-className");
 const _relations = "_relations";
+const _requestInstance = "_requestInstance";
 
 class Collection extends EventEmitter {
-    constructor(data, util) {
+    constructor(data, request) {
         super();
-        this[_util] = util || this.constructor[_util] || Util.extend({});
-        this.models = [];
 
         // Handle recursive require
         if (!Generic) {
             Generic = require('./generic-class');
         }
+
+        if(!Request){
+            Request = require('./request');
+        }
+
+        if(request instanceof Request){
+            this[_requestInstance] = request
+        } else {
+            this[_requestInstance] = new Request(request);
+        }
+        this[_util] = this[_requestInstance][_util];
+        this.models = [];
 
         this.add = this.push;
         this.where = this.filter;
@@ -68,7 +80,7 @@ class Collection extends EventEmitter {
                 element[_collections].push(this);
                 this._pushToModels(element, options);
             } else if (this[_class]) {
-                let newInstance = new this[_class](element, this[_util]);
+                let newInstance = new this[_class](element, this[_requestInstance]);
                 newInstance[_collections].push(this);
                 this._pushToModels(newInstance, options);
             } else {
@@ -222,70 +234,8 @@ class Collection extends EventEmitter {
         return data;
     }
 
-    _request(options = {}) {
-        let url = (options.url || this.url());
-        if (options.query) {
-          if(url.indexOf("?") === -1){
-            url += "?" + options.query;
-          } else {
-            url += "&" + options.query;
-          }
-        }
-        let headers = options["headers"] || {}
-        if (this[_util].session && !headers["x-session"]) {
-            headers["x-session"] = this[_util].session;
-        }
-        headers["Content-Type"] = "application/json";
-        headers["Accept"] = "application/json";
-        let requestOptions = Object.assign({}, options);
-        requestOptions.headers = headers;
-        requestOptions.url = url;
-        let responseFired = false;
-        let fireResponse = function(type, context, args, options) {
-            responseFired = true;
-            if (options[type]) {
-                options[type].apply(context, args);
-            }
-            if (options.complete) {
-                options.complete.call(context, context);
-            }
-        };
-        options.xhr = true;
-        let savedResponse;
-        fetch(url, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw response;
-                }
-                savedResponse = response;
-                return response.json();
-            })
-            .then((jsonResponse) => {
-                let data = this.parse(jsonResponse);
-                this.add(data);
-                savedResponse.responseJSON = jsonResponse;
-                fireResponse("success", this, [this, jsonResponse, savedResponse], options);
-            })
-            .catch((response) => {
-                if(responseFired){
-                    Util.throw(response);
-                }
-                if (response.text) {
-                    response.text().then((text) => {
-                        response.responseText = text;
-                        try {
-                            response.responseJSON = JSON.parse(text);
-                        } catch (error) {
-
-                        }
-                        fireResponse("error", this, [this, response], options);
-                    }).catch(() => {
-                        fireResponse("error", this, [this, response], options);
-                    });
-                } else {
-                    fireResponse("error", this, [this, response], options);
-                }
-            });
+    _request(options){
+      this[_requestInstance].send(this, options);
     }
 
     fetch(options = {}) {

@@ -2,7 +2,7 @@
   "name": "wapp-api",
   "version": "1.0.5",
   "description": "Helper functions to speed up wapp development process.",
-  "main": "main.js",
+  "main": "wappsto/index.js",
   "license": "Apache-2.0",
   "author": {
     "name": "Seluxit A/S",
@@ -24,7 +24,7 @@
     "url": "https://github.com/Wappsto/wapp-api/issues"
   },
   "scripts": {
-    "prepublish": "browserify main.js -o browser/wapp-api.js"
+    "prepublish": "browserify wappsto/index.js -o browser/wapp-api.js"
   },
   "dependencies": {
     "node-fetch": "^2.3.0",

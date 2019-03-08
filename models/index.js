@@ -1,4 +1,7 @@
+const Request = require('./request');
 const Util = require('../util');
+
+const _requestInstance = "_requestInstance";
 const _util = Symbol.for("generic-util");
 
 let toCreate = {
@@ -14,6 +17,7 @@ let toCreate = {
     Collection: require('./generic-collection')
 }
 
+/*
 // The only way to keep names, at least for now
 let extendClass = (c, key) => {
   switch (key) {
@@ -51,17 +55,23 @@ let extendClass = (c, key) => {
       throw new Error("undefined class name");
       break;
   }
-}
+}*/
 
 class WappstoModels {
-    constructor(util, wrapper) {
-        this[_util] = Util.extend(util);
+    constructor(request) {
+        let self = this;
+        if(request instanceof Request){
+            this[_requestInstance] = request
+        } else {
+            this[_requestInstance] = new Request(request);
+        }
+        this[_util] = this[_requestInstance][_util];
         for (let key in toCreate) {
-            // Get class name instead of anonmymous
-            this[key] = extendClass(toCreate[key], key);
-            this[key][_util] = this[_util];
-            if(wrapper){
-              wrapper(this[key]);
+            this[key] = function(data) {
+                if (!(this instanceof self[key])) {
+                    throw new Error(key + " should be created with `new`");
+                }
+                return new toCreate[key](data, self[_requestInstance]);
             }
         }
     }

@@ -1,379 +1,11 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-const fetch = require('node-fetch');
-const querystring = require('querystring');
-
-let Models = require('./models');
-let Stream = require('./stream');
-const Util = require('./util');
-
-const _util = Symbol("util");
-const _wappstoModels = Symbol("wappstoModels");
-const _Stream = Symbol("Stream");
-const _class = "defaultModel";
-const _className = Symbol.for("generic-collection-className");
-
-const STATUS = {
-  ACCEPTED: "accepted", // user accepted the request
-  PENDING: "pending",   // waiting for restservice
-  WAITING: "waiting"    // waiting for user to accept
-}
-
-const StreamModel = require('./models/stream');
-const Collection = require('./models/generic-collection');
-
-let callStatusChange = function(options, status){
-  if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
-    options.onStatusChange.call(this, status);
-  }
-};
-
-let makeRequest = function(request, requestOptions, options){
-  callStatusChange.call(this, options, STATUS.PENDING);
-  request.call(this, requestOptions);
-};
-
-class Wappsto {
-  constructor(util) {
-    this._wrapRequest = this._wrapRequest.bind(this);
-    this[_util] = Util.extend(util);
-    this[_wappstoModels] = new Models(util, this._wrapRequest);
-    this[_Stream] = Stream;
-    this.wStream = null;
-    this._waitFor = {};
-  }
-
-  get util() {
-    return this[_util];
-  }
-
-  get models() {
-    return this[_wappstoModels];
-  }
-
-  get Stream() {
-    return this[_Stream];
-  }
-
-  _wrapRequest(modelClass) {
-    if(modelClass.prototype instanceof Collection){
-      this._wrapCollection(modelClass);
-    } else if (!(modelClass.prototype instanceof StreamModel)){
-      this._wrapModel(modelClass);
-    }
-  }
-
-  _wrapCollection(collectionClass){
-    var self = this;
-    let defaultRequest = collectionClass.prototype._request;
-    collectionClass.prototype._request = function (options = {}){
-      if(this[_class].prototype instanceof StreamModel || this[_className] === "stream"){
-        return defaultRequest.call(this, options);
-      }
-
-      let requestOptions;
-      if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) ||options.url.indexOf("quantity") !== -1)){
-        let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
-        let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
-        requestOptions = {
-          ...options,
-          success: (col, response) => {
-            if(col.length < quantity){
-              callStatusChange.call(col, options, STATUS.WAITING);
-              self._waitFor[searchIn] = [...(self._waitFor[searchIn] || []), { model: col, options: options }];
-            } else {
-              callStatusChange.call(col, options, STATUS.ACCEPTED, col, response);
-              if(options.subscribe === true && self.wStream){
-                self.wStream.subscribe(col);
-              }
-              if(options.success){
-                options.success.call(col, col, response);
-              }
-            }
-          },
-          error: options.error
-        }
-      } else {
-        requestOptions = self._getPrecisePermissionOptions(options);
-      }
-      self._request(this, defaultRequest, requestOptions, options);
-    }
-  }
-
-  _wrapModel(modelClass){
-    if(modelClass.prototype instanceof StreamModel){
-      return;
-    }
-    let self = this;
-    let defaultRequest = modelClass.prototype._request;
-    modelClass.prototype._request = function (options = {}){
-      let requestOptions = self._getPrecisePermissionOptions(options);
-      self._request(this, defaultRequest, requestOptions, options);
-    }
-  }
-
-  _getPrecisePermissionOptions(options){
-    let self = this;
-    return {
-        ...options,
-        success: (model, jsonResponse, xhrResponse) => {
-          callStatusChange.call(model, options, STATUS.ACCEPTED);
-            if(options.subscribe === true && self.wStream){
-              self.wStream.subscribe(model);
-            }
-            if(options.success){
-                options.success.call(model, model, jsonResponse, xhrResponse);
-            }
-        },
-        error: (model, response) => {
-            if(response.responseJSON && [400013, 400008].indexOf(response.responseJSON.code) !== -1){
-                callStatusChange.call(model, options, STATUS.WAITING);
-                self._waitFor.installation = [...(self._waitFor.installation || []), {model: model, options: options}];
-            } else if(options.error){
-                options.error.call(model, response);
-            }
-        }
-    }
-  }
-
-  _request(model, defaultRequest, requestOptions, options){
-    if(this.wStreamPromise){
-      this.wStreamPromise.then(() => {
-        makeRequest.call(model, defaultRequest, requestOptions, options);
-      }).catch((response) => {
-        if(options.error){
-          options.error(response);
-        }
-      });
-    } else {
-      this.wStreamPromise = new Promise((resolve, reject) => {
-        this.initializeStream({
-          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
-          subscription: ["/notification"],
-          full: true
-        }, {
-          success: (wStream) => {
-            this.wStream = wStream;
-            this._addPermissionListener(wStream);
-            resolve(wStream);
-            makeRequest.call(model, defaultRequest, requestOptions, options);
-          },
-          error: (response) => {
-            this.wStreamPromise = null;
-            reject(response);
-            if(options.error){
-              options.error(response);
-            }
-          }
-        });
-      });
-    }
-  }
-
-  _getOptionsData(searchObj, options) {
-    let tempObj = {
-      method: options.method || ["retrieve", "update"]
-    };
-    for (let key in searchObj) {
-      let val = searchObj[key];
-      if (val !== undefined && val !== null) {
-        if (key == "_parent" && val instanceof Object) {
-          for (let k in val) {
-            tempObj["parent_" + k] = val[k];
-          }
-        } else {
-          tempObj["this_" + key] = val;
-        }
-      }
-    }
-    if (options.quantity) {
-      tempObj.quantity = options.quantity;
-    }
-    if (options.expand) {
-      tempObj.expand = options.expand;
-    }
-    if (options.message) {
-      tempObj.message = options.message;
-    }
-    return tempObj;
-  }
-
-  create(type, obj = {}, options){
-      if(!type || !this.models[type]){
-          console.error("you must specify a model type");
-          return;
-      }
-
-      let model = new this.models[type]();
-      model.save(obj, options);
-  }
-
-  get(searchIn, searchObj, options = {}) {
-      // Checking searchIn
-      if(!searchIn){
-        console.error("you must specify a service");
-        return false;
-      }
-
-      // Checking quantity
-      if(options.hasOwnProperty("quantity")){
-        let quantity = options.quantity;
-        if((isNaN(quantity) &&  quantity !== "all") || (!isNaN(quantity) && parseInt(quantity) < 1)){
-          console.error("quantity must be a positive number");
-          return false;
-        }
-      }
-
-      let self = this;
-      let data = this._getOptionsData(searchObj, options);
-      data = querystring.stringify(data);
-
-      let collection = new self[_wappstoModels].Collection();
-      let M = searchIn.charAt(0).toUpperCase() + searchIn.slice(1);
-      M = self[_wappstoModels][M];
-
-      if (M) {
-        collection[_class] = M;
-      }
-
-      let requestOptions = {
-        ...options,
-        url: this.util.baseUrl + "/" + searchIn + "?" + data,
-        error: (col, response) => {
-          if(options.error){
-            options.error(response);
-          }
-        }
-      };
-      collection.fetch(requestOptions);
-  }
-
-  initializeStream(streamJSON, options = {}) {
-    let models = [];
-    let searchFor = {};
-    if(!streamJSON){
-      streamJSON = {};
-    } else if(streamJSON.constructor === Array){
-      let paths = [];
-      streamJSON.forEach((obj) => {
-        if(obj instanceof this.models.Model){
-          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
-          paths.push(url);
-          models.push(obj);
-        } else if(obj.constructor === Object){
-          path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
-          if(path){
-            paths.push(path);
-          }
-        }
-      });
-      streamJSON = {
-        subscription: paths
-      };
-    }
-    if(streamJSON.name){
-      searchFor = {
-        name: streamJSON.name
-      }
-    }
-    this.get('stream', searchFor, {
-      expand: 1,
-      success: (streamCollection) => {
-        if (streamCollection.length > 0) {
-          if (!streamJSON.hasOwnProperty('full')) {
-              streamJSON.full = true;
-          }
-          let stream = streamCollection.first();
-
-          // merging with json
-          if(streamJSON.subscription){
-            streamJSON.subscription = [...streamJSON.subscription, ...stream.get("subscription")];
-          }
-          if(streamJSON.ignore){
-            streamJSON.ignore = [...streamJSON.ignore, ...stream.get("ignore")];
-          }
-
-          stream.save(streamJSON, {
-            patch: true,
-            success: () => {
-              this._startStream(stream, models, options);
-            },
-            error: (col, response) => {
-              if(options.error){
-                options.error(response);
-              }
-            }
-          });
-        } else {
-          this._createStream(streamJSON, models, options);
-        }
-      },
-      error: (col, response) => {
-        if(options.error){
-          options.error(response);
-        }
-      }
-    });
-  }
-
-  _createStream(streamJSON, models, options) {
-    let stream = new this.models.Stream(streamJSON);
-    stream.save({}, {
-        success: () => {
-            this._startStream(stream, models, options);
-        },
-        error: (model, response) => {
-            if(options.error){
-              options.error(response);
-            }
-        }
-    });
-  }
-
-  _startStream(stream, models, options){
-    let wStream = new this.Stream(stream);
-    wStream.open();
-    if(options.subscribe === true){
-      wStream.subscribe(models);
-    }
-    if(options.success){
-      options.success(wStream);
-    }
-  }
-
-  _addPermissionListener(wStream) {
-    wStream.on("permission:added", (type, ids) => {
-      if(this._waitFor[type]){
-        this._waitFor[type].forEach((obj) => {
-          if(!obj.options){
-            obj.options = {};
-          }
-          obj.options.onlySuccess = true;
-          obj.model._request(obj.options);
-        });
-        delete this._waitFor[type];
-      }
-    });
-  }
-}
-
-try {
-  if (typeof window === 'object' && window.document) {
-    window.Wappsto = Wappsto;
-  }
-} catch (e) {
-
-}
-
-module.exports = Wappsto;
-
-},{"./models":6,"./models/generic-collection":5,"./models/stream":11,"./stream":53,"./util":56,"node-fetch":24,"querystring":30}],2:[function(require,module,exports){
 const Generic = require('./generic-class');
 
 class Data extends Generic{}
 
 module.exports = Data;
 
-},{"./generic-class":4}],3:[function(require,module,exports){
+},{"./generic-class":3}],2:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Value = require('./value');
@@ -399,11 +31,12 @@ Device["_relations"] = [{
 
 module.exports = Device;
 
-},{"../util":56,"./generic-class":4,"./set":9,"./value":12}],4:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
 const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
 const Collection = require('./generic-collection');
+const Request = require('./request');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
 const _collections = Symbol.for("generic-class-collections");
@@ -413,12 +46,18 @@ const _util = Symbol.for("generic-util");
 const _class = "defaultModel";
 const _relations = "_relations";
 const _defaults = "_defaults";
+const _requestInstance = "_requestInstance";
 
 class Generic extends EventEmitter {
 
-    constructor(attributes = {}, util) {
+    constructor(attributes = {}, request) {
         super();
-        this[_util] = util || this.constructor[_util] || Util.extend({});
+        if(request instanceof Request){
+          this[_requestInstance] = request
+        } else {
+          this[_requestInstance] = new Request(request);
+        }
+        this[_util] = this[_requestInstance][_util];
 
         // Initializing attributes
         this.attributes = {};
@@ -478,9 +117,9 @@ class Generic extends EventEmitter {
         relatedClass
     }) {
         if (type === Util.type.One) {
-            this.attributes[key] = new relatedClass({}, this[_util]);
+            this.attributes[key] = new relatedClass({}, this[_requestInstance]);
         } else if (type === Util.type.Many) {
-            let col = new Collection(undefined, this[_util]);
+            let col = new Collection(undefined, this[_requestInstance]);
             col[_parent] = this;
             col[_class] = relatedClass;
             this.attributes[key] = col;
@@ -519,7 +158,10 @@ class Generic extends EventEmitter {
 
     set(data, value, options) {
         if (Object.prototype.toString.call(data) == "[object Object]") {
+            let events = [];
+            let oldValue = Object.assign({}, this.attributes);
             for (let key in data) {
+                let event;
                 if (this.constructor[_relations]) {
                     // Looking for key in relations
                     let relation = this.constructor[_relations].find((element) => {
@@ -532,14 +174,24 @@ class Generic extends EventEmitter {
                             this.get(key).push(data[key], value);
                         }
                     } else {
-                        this._set(key, data[key], value);
+                        event = this._set(key, data[key], value);
                     }
                 } else {
-                    this._set(key, data[key], value);
+                    event = this._set(key, data[key], value);
+                }
+                if(event){
+                  events.push(event);
                 }
             }
+            let newValue = Object.assign({}, this.attributes);
+            this._emitEvents(events, options);
+            this.emit("change", this, newValue, oldValue, null, options);
         } else {
-            this._set(data, value, options);
+            let event = this._set(data, value, options);
+            if(event){
+              this._emitEvents([event], options);
+              this.emit("change", this, event.newValue, event.oldValue, event.key, options);
+            }
         }
     }
 
@@ -547,9 +199,21 @@ class Generic extends EventEmitter {
         if (this.attributes[key] !== value) {
             let oldValue = this.attributes[key]
             this.attributes[key] = value;
-            this.emit("change:" + key, this, value, oldValue, key, options);
-            this.emit("change", this, value, oldValue, key, options);
+            return {
+              key: key,
+              oldValue: oldValue,
+              newValue: value
+            }
         }
+        return null;
+    }
+
+    _emitEvents(events, options){
+      events.forEach((e) => {
+        if(e){
+          this.emit("change:" + e.key, this, e.newValue, e.oldValue, e.key, options);
+        }
+      });
     }
 
     // Called whenever a RESTful call is success(POST/PUT/PATCH)
@@ -578,73 +242,10 @@ class Generic extends EventEmitter {
         return json;
     }
 
-    _request(options = {}) {
-        let url = (options.url || this.url());
-        if (options.query) {
-          if(url.indexOf("?") === -1){
-            url += "?" + options.query;
-          } else {
-            url += "&" + options.query;
-          }
-        }
-        let headers = options["headers"] || {}
-        if (this[_util].session && !headers["x-session"]) {
-            headers["x-session"] = this[_util].session;
-        }
-        headers["Content-Type"] = "application/json";
-        headers["Accept"] = "application/json";
-        let requestOptions = Object.assign({}, options);
-        requestOptions.headers = headers;
-        requestOptions.url = url;
-        let responseFired = false;
-        let fireResponse = function(type, context, args, options) {
-            responseFired = true;
-            if (options[type]) {
-                options[type].apply(context, args);
-            }
-            if (options.complete) {
-                options.complete.call(context, context);
-            }
-        };
-        options.xhr = true;
-        let savedResponse;
-        fetch(url, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw response;
-                }
-                savedResponse = response;
-                return response.json();
-            })
-            .then((jsonResponse) => {
-                if (options.parse !== false) {
-                    let data = this.parse(jsonResponse);
-                    this.set(data, options);
-                }
-                savedResponse.responseJSON = jsonResponse;
-                fireResponse("success", this, [this, jsonResponse, savedResponse], options);
-            })
-            .catch((response) => {
-                if(responseFired){
-                    Util.throw(response);
-                }
-                if (response.text) {
-                    response.text().then((text) => {
-                        response.responseText = text;
-                        try {
-                            response.responseJSON = JSON.parse(text);
-                        } catch (error) {
-
-                        }
-                        fireResponse("error", this, [this, response], options);
-                    }).catch(() => {
-                        fireResponse("error", this, [this, response], options);
-                    });
-                } else {
-                    fireResponse("error", this, [this, response], options);
-                }
-            });
+    _request(options){
+      this[_requestInstance].send(this, options);
     }
+
 
     fetch(options = {}) {
         options.method = "GET";
@@ -709,10 +310,11 @@ class Generic extends EventEmitter {
 
 module.exports = Generic;
 
-},{"../util":56,"./generic-collection":5,"events":18,"node-fetch":24}],5:[function(require,module,exports){
+},{"../util":56,"./generic-collection":4,"./request":8,"events":18,"node-fetch":24}],4:[function(require,module,exports){
 const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
+let Request;
 let Generic;
 
 const _collections = Symbol.for("generic-class-collections");
@@ -721,17 +323,28 @@ const _util = Symbol.for("generic-util");
 const _class = "defaultModel";
 const _className = Symbol.for("generic-collection-className");
 const _relations = "_relations";
+const _requestInstance = "_requestInstance";
 
 class Collection extends EventEmitter {
-    constructor(data, util) {
+    constructor(data, request) {
         super();
-        this[_util] = util || this.constructor[_util] || Util.extend({});
-        this.models = [];
 
         // Handle recursive require
         if (!Generic) {
             Generic = require('./generic-class');
         }
+
+        if(!Request){
+            Request = require('./request');
+        }
+
+        if(request instanceof Request){
+            this[_requestInstance] = request
+        } else {
+            this[_requestInstance] = new Request(request);
+        }
+        this[_util] = this[_requestInstance][_util];
+        this.models = [];
 
         this.add = this.push;
         this.where = this.filter;
@@ -780,7 +393,7 @@ class Collection extends EventEmitter {
                 element[_collections].push(this);
                 this._pushToModels(element, options);
             } else if (this[_class]) {
-                let newInstance = new this[_class](element, this[_util]);
+                let newInstance = new this[_class](element, this[_requestInstance]);
                 newInstance[_collections].push(this);
                 this._pushToModels(newInstance, options);
             } else {
@@ -934,70 +547,8 @@ class Collection extends EventEmitter {
         return data;
     }
 
-    _request(options = {}) {
-        let url = (options.url || this.url());
-        if (options.query) {
-          if(url.indexOf("?") === -1){
-            url += "?" + options.query;
-          } else {
-            url += "&" + options.query;
-          }
-        }
-        let headers = options["headers"] || {}
-        if (this[_util].session && !headers["x-session"]) {
-            headers["x-session"] = this[_util].session;
-        }
-        headers["Content-Type"] = "application/json";
-        headers["Accept"] = "application/json";
-        let requestOptions = Object.assign({}, options);
-        requestOptions.headers = headers;
-        requestOptions.url = url;
-        let responseFired = false;
-        let fireResponse = function(type, context, args, options) {
-            responseFired = true;
-            if (options[type]) {
-                options[type].apply(context, args);
-            }
-            if (options.complete) {
-                options.complete.call(context, context);
-            }
-        };
-        options.xhr = true;
-        let savedResponse;
-        fetch(url, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw response;
-                }
-                savedResponse = response;
-                return response.json();
-            })
-            .then((jsonResponse) => {
-                let data = this.parse(jsonResponse);
-                this.add(data);
-                savedResponse.responseJSON = jsonResponse;
-                fireResponse("success", this, [this, jsonResponse, savedResponse], options);
-            })
-            .catch((response) => {
-                if(responseFired){
-                    Util.throw(response);
-                }
-                if (response.text) {
-                    response.text().then((text) => {
-                        response.responseText = text;
-                        try {
-                            response.responseJSON = JSON.parse(text);
-                        } catch (error) {
-
-                        }
-                        fireResponse("error", this, [this, response], options);
-                    }).catch(() => {
-                        fireResponse("error", this, [this, response], options);
-                    });
-                } else {
-                    fireResponse("error", this, [this, response], options);
-                }
-            });
+    _request(options){
+      this[_requestInstance].send(this, options);
     }
 
     fetch(options = {}) {
@@ -1059,8 +610,11 @@ class Collection extends EventEmitter {
 
 module.exports = Collection;
 
-},{"../util":56,"./generic-class":4,"events":18,"node-fetch":24}],6:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./request":8,"events":18,"node-fetch":24}],5:[function(require,module,exports){
+const Request = require('./request');
 const Util = require('../util');
+
+const _requestInstance = "_requestInstance";
 const _util = Symbol.for("generic-util");
 
 let toCreate = {
@@ -1076,6 +630,7 @@ let toCreate = {
     Collection: require('./generic-collection')
 }
 
+/*
 // The only way to keep names, at least for now
 let extendClass = (c, key) => {
   switch (key) {
@@ -1113,17 +668,23 @@ let extendClass = (c, key) => {
       throw new Error("undefined class name");
       break;
   }
-}
+}*/
 
 class WappstoModels {
-    constructor(util, wrapper) {
-        this[_util] = Util.extend(util);
+    constructor(request) {
+        let self = this;
+        if(request instanceof Request){
+            this[_requestInstance] = request
+        } else {
+            this[_requestInstance] = new Request(request);
+        }
+        this[_util] = this[_requestInstance][_util];
         for (let key in toCreate) {
-            // Get class name instead of anonmymous
-            this[key] = extendClass(toCreate[key], key);
-            this[key][_util] = this[_util];
-            if(wrapper){
-              wrapper(this[key]);
+            this[key] = function(data) {
+                if (!(this instanceof self[key])) {
+                    throw new Error(key + " should be created with `new`");
+                }
+                return new toCreate[key](data, self[_requestInstance]);
             }
         }
     }
@@ -1135,7 +696,7 @@ class WappstoModels {
 
 module.exports = WappstoModels;
 
-},{"../util":56,"./data":2,"./device":3,"./generic-class":4,"./generic-collection":5,"./network":7,"./notification":8,"./set":9,"./state":10,"./stream":11,"./value":12}],7:[function(require,module,exports){
+},{"../util":56,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Device = require('./device');
@@ -1161,7 +722,7 @@ Network["_relations"] = [{
 
 module.exports = Network;
 
-},{"../util":56,"./device":3,"./generic-class":4,"./set":9}],8:[function(require,module,exports){
+},{"../util":56,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 
@@ -1175,7 +736,149 @@ Notification[_pickAttributes] = {
 
 module.exports = Notification;
 
-},{"../util":56,"./generic-class":4}],9:[function(require,module,exports){
+},{"../util":56,"./generic-class":3}],8:[function(require,module,exports){
+const fetch = require('node-fetch');
+const Collection = require('./generic-collection');
+const Util = require('../util');
+
+const _util = Symbol.for("generic-util");
+
+class Request {
+  constructor(util) {
+    this[_util] = Util.extend(util);
+    this.send = this.send.bind(this);
+  }
+
+  send(context, options){
+    if(context instanceof Collection){
+      this._collection(context, options);
+    } else {
+      this._model(context, options);
+    }
+  }
+
+  _model(model, options = {}) {
+    let savedResponse;
+    let responseFired = false;
+    return this._sendRequest(model, options)
+      .then((response) => {
+        if (!response.ok) {
+          throw response;
+        }
+        savedResponse = response;
+        return response.json();
+      })
+      .then((jsonResponse) => {
+        if (options.parse !== false) {
+          let data = model.parse(jsonResponse);
+          model.set(data, options);
+        }
+        savedResponse.responseJSON = jsonResponse;
+        this._fireResponse("success", model, [model, jsonResponse, savedResponse], options);
+      })
+      .catch((response) => {
+        if (responseFired) {
+          Util.throw(response);
+        }
+        if (response.text) {
+          response.text().then((text) => {
+            response.responseText = text;
+            try {
+              response.responseJSON = JSON.parse(text);
+            } catch (error) {
+
+            }
+            responseFired = true;
+            this._fireResponse("error", model, [model, response], options);
+          }).catch(() => {
+            responseFired = true;
+            this._fireResponse("error", model, [model, response], options);
+          });
+        } else {
+          responseFired = true;
+          this._fireResponse("error", model, [model, response], options);
+        }
+      });
+  }
+
+  _collection(collection, options = {}) {
+    let savedResponse;
+    let responseFired = false;
+    return this._sendRequest(collection, options)
+      .then((response) => {
+        if (!response.ok) {
+          throw response;
+        }
+        savedResponse = response;
+        return response.json();
+      })
+      .then((jsonResponse) => {
+        let data = collection.parse(jsonResponse);
+        collection.add(data);
+        savedResponse.responseJSON = jsonResponse;
+        responseFired = true;
+        this._fireResponse("success", collection, [collection, jsonResponse, savedResponse], options);
+      })
+      .catch((response) => {
+        if (responseFired) {
+          Util.throw(response);
+        }
+        if (response.text) {
+          response.text().then((text) => {
+            response.responseText = text;
+            try {
+              response.responseJSON = JSON.parse(text);
+            } catch (error) {
+
+            }
+            responseFired = true;
+            this._fireResponse("error", collection, [collection, response], options);
+          }).catch(() => {
+            responseFired = true;
+            this._fireResponse("error", collection, [collection, response], options);
+          });
+        } else {
+          responseFired = true;
+          this._fireResponse("error", collection, [collection, response], options);
+        }
+      });
+  }
+
+  _sendRequest(context, options = {}) {
+    let url = (options.url || context.url());
+    if (options.query) {
+      if (url.indexOf("?") === -1) {
+        url += "?" + options.query;
+      } else {
+        url += "&" + options.query;
+      }
+    }
+    let headers = options["headers"] || {}
+    if (this[_util].session && !headers["x-session"]) {
+      headers["x-session"] = this[_util].session;
+    }
+    headers["Content-Type"] = "application/json";
+    headers["Accept"] = "application/json";
+    let requestOptions = Object.assign({}, options);
+    requestOptions.headers = headers;
+    requestOptions.url = url;
+    options.xhr = true;
+    return fetch(url, requestOptions);
+  }
+
+  _fireResponse(type, context, args, options) {
+    if (options[type]) {
+      options[type].apply(context, args);
+    }
+    if (options.complete) {
+      options.complete.call(context, context);
+    }
+  }
+}
+
+module.exports = Request;
+
+},{"../util":56,"./generic-collection":4,"node-fetch":24}],9:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Collection = require('./generic-collection');
@@ -1259,7 +962,7 @@ Set[_pickAttributes] = {
 
 module.exports = Set;
 
-},{"../util":56,"./generic-class":4,"./generic-collection":5}],10:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
 const Generic = require('./generic-class');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
@@ -1272,7 +975,7 @@ State[_pickAttributes] = {
 
 module.exports = State;
 
-},{"./generic-class":4}],11:[function(require,module,exports){
+},{"./generic-class":3}],11:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
@@ -1290,7 +993,7 @@ Stream[_pickAttributes] = {
 
 module.exports = Stream;
 
-},{"../util":56,"./generic-class":4}],12:[function(require,module,exports){
+},{"../util":56,"./generic-class":3}],12:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require("./generic-class");
 const State = require('./state');
@@ -1316,7 +1019,7 @@ Value["_relations"] = [{
 
 module.exports = Value;
 
-},{"../util":56,"./generic-class":4,"./set":9,"./state":10}],13:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -9644,7 +9347,7 @@ class WappstoStream extends EventEmitter {
             console.error("stream model is not found, cannot update subscriptions");
             return;
         }
-        if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
+        if(arr.constructor !== Array && !(arr instanceof Collection)){
             arr = [arr];
         }
         let subscriptions = [];
@@ -9805,7 +9508,7 @@ class WappstoStream extends EventEmitter {
 
 module.exports = WappstoStream;
 
-},{"../models/generic-class":4,"../models/generic-collection":5,"../models/stream":11,"../tracer":55,"../util":56,"./stream-polyfill":54,"events":18}],54:[function(require,module,exports){
+},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":55,"../util":56,"./stream-polyfill":54,"events":18}],54:[function(require,module,exports){
 let WebSocket;
 if(typeof window === 'object' && window.document && window.WebSocket){
     WebSocket = window.WebSocket;
@@ -10000,4 +9703,390 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"_process":26}]},{},[1]);
+},{"_process":26}],57:[function(require,module,exports){
+const fetch = require('node-fetch');
+const querystring = require('querystring');
+
+const Models = require('../models');
+const Stream = require('../stream');
+const Util = require('../util');
+
+const Request = require('./request');
+
+const _util = Symbol.for("generic-util");
+const _wappstoModels = Symbol("wappstoModels");
+const _Stream = Symbol("Stream");
+const _class = "defaultModel";
+const _className = Symbol.for("generic-collection-className");
+const _requestInstance = "_requestInstance";
+
+class Wappsto {
+  constructor(request) {
+    if(request instanceof Request){
+        this[_requestInstance] = request
+    } else {
+        this[_requestInstance] = new Request(request, this);
+    }
+    this[_util] = this[_requestInstance][_util];
+    this[_wappstoModels] = new Models(this[_requestInstance]);
+    this[_Stream] = Stream;
+  }
+
+  get util() {
+    return this[_util];
+  }
+
+  get models() {
+    return this[_wappstoModels];
+  }
+
+  get Stream() {
+    return this[_Stream];
+  }
+
+  get wStream(){
+    return this[_requestInstance]._wStream;
+  }
+
+  set wStream(wStream){
+    this[_requestInstance]._wStream = wStream;
+  }
+
+  create(type, obj = {}, options){
+      if(!type || !this.models[type]){
+          console.error("you must specify a model type");
+          return;
+      }
+
+      let model = new this.models[type]();
+      model.save(obj, options);
+  }
+
+  get(searchIn, searchObj, options = {}) {
+      // Checking searchIn
+      if(!searchIn){
+        console.error("you must specify a service");
+        return false;
+      }
+
+      // Checking quantity
+      if(options.hasOwnProperty("quantity")){
+        let quantity = options.quantity;
+        if((isNaN(quantity) &&  quantity !== "all") || (!isNaN(quantity) && parseInt(quantity) < 1)){
+          console.error("quantity must be a positive number");
+          return false;
+        }
+      }
+
+      let data = this._getOptionsData(searchObj, options);
+      data = querystring.stringify(data);
+
+      let collection = new this.models.Collection();
+      collection[_className] = searchIn;
+      let M = searchIn.charAt(0).toUpperCase() + searchIn.slice(1);
+      M = this.models[M];
+
+      if (M) {
+        collection[_class] = M;
+      }
+
+      let requestOptions = {
+        ...options,
+        url: this[_util].baseUrl + "/" + searchIn + "?" + data,
+        error: (col, response) => {
+          if(options.error){
+            options.error(response);
+          }
+        }
+      };
+      collection.fetch(requestOptions);
+  }
+
+  _getOptionsData(searchObj, options) {
+    let tempObj = {
+      method: options.method || ["retrieve", "update"]
+    };
+    for (let key in searchObj) {
+      let val = searchObj[key];
+      if (val !== undefined && val !== null) {
+        if (key == "_parent" && val instanceof Object) {
+          for (let k in val) {
+            tempObj["parent_" + k] = val[k];
+          }
+        } else {
+          tempObj["this_" + key] = val;
+        }
+      }
+    }
+    if (options.quantity) {
+      tempObj.quantity = options.quantity;
+    }
+    if (options.expand) {
+      tempObj.expand = options.expand;
+    }
+    if (options.message) {
+      tempObj.message = options.message;
+    }
+    return tempObj;
+  }
+
+  initializeStream(streamJSON, options = {}) {
+    let models = [];
+    let searchFor = {};
+    if(!streamJSON){
+      streamJSON = {};
+    } else if(streamJSON.constructor === Array){
+      let paths = [];
+      streamJSON.forEach((obj) => {
+        if(obj instanceof this.models.Model){
+          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
+          paths.push(url);
+          models.push(obj);
+        } else if(obj.constructor === Object){
+          path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+          if(path){
+            paths.push(path);
+          }
+        }
+      });
+      streamJSON = {
+        subscription: paths
+      };
+    }
+    if(streamJSON.name){
+      searchFor = {
+        name: streamJSON.name
+      }
+    }
+    this.get('stream', searchFor, {
+      expand: 1,
+      success: (streamCollection) => {
+        if (streamCollection.length > 0) {
+          if (!streamJSON.hasOwnProperty('full')) {
+              streamJSON.full = true;
+          }
+          let stream = streamCollection.first();
+
+          // merging with json
+          if(streamJSON.subscription){
+            streamJSON.subscription = [...streamJSON.subscription, ...stream.get("subscription")];
+          }
+          if(streamJSON.ignore){
+            streamJSON.ignore = [...streamJSON.ignore, ...stream.get("ignore")];
+          }
+
+          stream.save(streamJSON, {
+            patch: true,
+            success: () => {
+              this._startStream(stream, models, options);
+            },
+            error: (col, response) => {
+              if(options.error){
+                options.error(response);
+              }
+            }
+          });
+        } else {
+          this._createStream(streamJSON, models, options);
+        }
+      },
+      error: (response) => {
+        if(options.error){
+          options.error(response);
+        }
+      }
+    });
+  }
+
+  _createStream(streamJSON, models, options) {
+    let stream = new this.models.Stream(streamJSON);
+    stream.save({}, {
+        success: () => {
+            this._startStream(stream, models, options);
+        },
+        error: (model, response) => {
+            if(options.error){
+              options.error(response);
+            }
+        }
+    });
+  }
+
+  _startStream(stream, models, options){
+    let wStream = new this.Stream(stream);
+    wStream.open();
+    if(options.subscribe === true){
+      wStream.subscribe(models);
+    }
+    if(options.success){
+      options.success(wStream);
+    }
+  }
+}
+
+try {
+  if (typeof window === 'object' && window.document) {
+    window.Wappsto = Wappsto;
+  }
+} catch (e) {
+
+}
+
+module.exports = Wappsto;
+
+},{"../models":5,"../stream":53,"../util":56,"./request":58,"node-fetch":24,"querystring":30}],58:[function(require,module,exports){
+const Request = require('../models/request');
+const StreamModel = require('../models/stream');
+const Collection = require('../models/generic-collection');
+
+const _class = "defaultModel";
+const _className = Symbol.for("generic-collection-className");
+
+const STATUS = {
+  ACCEPTED: "accepted", // user accepted the request
+  PENDING: "pending",   // waiting for restservice
+  WAITING: "waiting"    // waiting for user to accept
+}
+
+let callStatusChange = function(options, status){
+  if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
+    options.onStatusChange.call(this, status);
+  }
+};
+
+class WappstoRequest extends Request {
+  constructor(util, wappsto){
+    super(util);
+    this._wappsto = wappsto;
+    this._waitFor = {};
+  }
+
+  _model(model, options = {}){
+    if(model instanceof StreamModel){
+      super._model.apply(this, arguments);
+      return;
+    }
+    let requestOptions = this._getPrecisePermissionOptions(options);
+    this._wrapRequest(model, requestOptions, options);
+  }
+
+  _collection(collection, options = {}){
+    if(collection[_class].prototype instanceof StreamModel || collection[_className] === "stream"){
+      return super._collection.apply(this, arguments);
+    }
+    let self = this;
+    let requestOptions;
+    if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) ||options.url.indexOf("quantity") !== -1)){
+      let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
+      let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
+      requestOptions = {
+        ...options,
+        success: (col, response) => {
+          if(col.length < quantity){
+            callStatusChange.call(col, options, STATUS.WAITING);
+            self._waitFor[searchIn] = [...(self._waitFor[searchIn] || []), { context: col, options: options }];
+          } else {
+            callStatusChange.call(col, options, STATUS.ACCEPTED, col, response);
+            console.log(options.subscribe);
+            if(options.subscribe === true && self._wStream){
+              self._wStream.subscribe(col);
+            }
+            if(options.success){
+              options.success.call(col, col, response);
+            }
+          }
+        },
+        error: options.error
+      }
+    } else {
+      requestOptions = this._getPrecisePermissionOptions(options);
+    }
+    this._wrapRequest(collection, requestOptions, options);
+  }
+
+  _getPrecisePermissionOptions(options){
+    let self = this;
+    return {
+        ...options,
+        success: (context, jsonResponse, xhrResponse) => {
+          callStatusChange.call(context, options, STATUS.ACCEPTED);
+            if(options.subscribe === true && self._wStream){
+              self._wStream.subscribe(context);
+            }
+            if(options.success){
+                options.success.call(context, context, jsonResponse, xhrResponse);
+            }
+        },
+        error: (context, response) => {
+            if(response.responseJSON && [400013, 400008].indexOf(response.responseJSON.code) !== -1){
+                callStatusChange.call(context, options, STATUS.WAITING);
+                self._waitFor.installation = [...(self._waitFor.installation || []), {context: context, options: options}];
+            } else if(options.error){
+                options.error.call(context, response);
+            }
+        }
+    }
+  }
+
+  _wrapRequest(context, requestOptions, options){
+    if(this._wStreamPromise){
+      this._wStreamPromise.then(() => {
+        this._makeRequest(context, requestOptions, options);
+      }).catch((response) => {
+        if(options.error){
+          options.error(response);
+        }
+      });
+    } else {
+      this._wStreamPromise = new Promise((resolve, reject) => {
+        this._wappsto.initializeStream({
+          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
+          subscription: ["/notification"],
+          full: true
+        }, {
+          success: (wStream) => {
+            this._wStream = wStream;
+            this._addPermissionListener(wStream);
+            resolve(wStream);
+            this._makeRequest(context, requestOptions, options);
+          },
+          error: (response) => {
+            this._wStreamPromise = null;
+            reject(response);
+            if(options.error){
+              options.error(response);
+            }
+          }
+        });
+      });
+    }
+  }
+
+  _makeRequest(context, requestOptions, options){
+    callStatusChange.call(context, options, STATUS.PENDING);
+    if(context instanceof Collection){
+      super._collection(context, requestOptions);
+    } else {
+      super._model(context, requestOptions);
+    }
+  }
+
+  _addPermissionListener(wStream) {
+    wStream.on("permission:added", (type, ids) => {
+      if(this._waitFor[type]){
+        this._waitFor[type].forEach((obj) => {
+          if(!obj.options){
+            obj.options = {};
+          }
+          obj.options.onlySuccess = true;
+          obj.context._request(obj.options);
+        });
+        delete this._waitFor[type];
+      }
+    });
+  }
+}
+
+module.exports = WappstoRequest;
+
+},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}]},{},[57]);

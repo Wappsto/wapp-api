@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
 const Collection = require('./generic-collection');
+const Request = require('./request');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
 const _collections = Symbol.for("generic-class-collections");
@@ -11,12 +12,18 @@ const _util = Symbol.for("generic-util");
 const _class = "defaultModel";
 const _relations = "_relations";
 const _defaults = "_defaults";
+const _requestInstance = "_requestInstance";
 
 class Generic extends EventEmitter {
 
-    constructor(attributes = {}, util) {
+    constructor(attributes = {}, request) {
         super();
-        this[_util] = util || this.constructor[_util] || Util.extend({});
+        if(request instanceof Request){
+          this[_requestInstance] = request
+        } else {
+          this[_requestInstance] = new Request(request);
+        }
+        this[_util] = this[_requestInstance][_util];
 
         // Initializing attributes
         this.attributes = {};
@@ -76,9 +83,9 @@ class Generic extends EventEmitter {
         relatedClass
     }) {
         if (type === Util.type.One) {
-            this.attributes[key] = new relatedClass({}, this[_util]);
+            this.attributes[key] = new relatedClass({}, this[_requestInstance]);
         } else if (type === Util.type.Many) {
-            let col = new Collection(undefined, this[_util]);
+            let col = new Collection(undefined, this[_requestInstance]);
             col[_parent] = this;
             col[_class] = relatedClass;
             this.attributes[key] = col;
@@ -117,7 +124,10 @@ class Generic extends EventEmitter {
 
     set(data, value, options) {
         if (Object.prototype.toString.call(data) == "[object Object]") {
+            let events = [];
+            let oldValue = Object.assign({}, this.attributes);
             for (let key in data) {
+                let event;
                 if (this.constructor[_relations]) {
                     // Looking for key in relations
                     let relation = this.constructor[_relations].find((element) => {
@@ -130,14 +140,24 @@ class Generic extends EventEmitter {
                             this.get(key).push(data[key], value);
                         }
                     } else {
-                        this._set(key, data[key], value);
+                        event = this._set(key, data[key], value);
                     }
                 } else {
-                    this._set(key, data[key], value);
+                    event = this._set(key, data[key], value);
+                }
+                if(event){
+                  events.push(event);
                 }
             }
+            let newValue = Object.assign({}, this.attributes);
+            this._emitEvents(events, options);
+            this.emit("change", this, newValue, oldValue, null, options);
         } else {
-            this._set(data, value, options);
+            let event = this._set(data, value, options);
+            if(event){
+              this._emitEvents([event], options);
+              this.emit("change", this, event.newValue, event.oldValue, event.key, options);
+            }
         }
     }
 
@@ -145,9 +165,21 @@ class Generic extends EventEmitter {
         if (this.attributes[key] !== value) {
             let oldValue = this.attributes[key]
             this.attributes[key] = value;
-            this.emit("change:" + key, this, value, oldValue, key, options);
-            this.emit("change", this, value, oldValue, key, options);
+            return {
+              key: key,
+              oldValue: oldValue,
+              newValue: value
+            }
         }
+        return null;
+    }
+
+    _emitEvents(events, options){
+      events.forEach((e) => {
+        if(e){
+          this.emit("change:" + e.key, this, e.newValue, e.oldValue, e.key, options);
+        }
+      });
     }
 
     // Called whenever a RESTful call is success(POST/PUT/PATCH)
@@ -176,73 +208,10 @@ class Generic extends EventEmitter {
         return json;
     }
 
-    _request(options = {}) {
-        let url = (options.url || this.url());
-        if (options.query) {
-          if(url.indexOf("?") === -1){
-            url += "?" + options.query;
-          } else {
-            url += "&" + options.query;
-          }
-        }
-        let headers = options["headers"] || {}
-        if (this[_util].session && !headers["x-session"]) {
-            headers["x-session"] = this[_util].session;
-        }
-        headers["Content-Type"] = "application/json";
-        headers["Accept"] = "application/json";
-        let requestOptions = Object.assign({}, options);
-        requestOptions.headers = headers;
-        requestOptions.url = url;
-        let responseFired = false;
-        let fireResponse = function(type, context, args, options) {
-            responseFired = true;
-            if (options[type]) {
-                options[type].apply(context, args);
-            }
-            if (options.complete) {
-                options.complete.call(context, context);
-            }
-        };
-        options.xhr = true;
-        let savedResponse;
-        fetch(url, requestOptions)
-            .then((response) => {
-                if (!response.ok) {
-                    throw response;
-                }
-                savedResponse = response;
-                return response.json();
-            })
-            .then((jsonResponse) => {
-                if (options.parse !== false) {
-                    let data = this.parse(jsonResponse);
-                    this.set(data, options);
-                }
-                savedResponse.responseJSON = jsonResponse;
-                fireResponse("success", this, [this, jsonResponse, savedResponse], options);
-            })
-            .catch((response) => {
-                if(responseFired){
-                    Util.throw(response);
-                }
-                if (response.text) {
-                    response.text().then((text) => {
-                        response.responseText = text;
-                        try {
-                            response.responseJSON = JSON.parse(text);
-                        } catch (error) {
-
-                        }
-                        fireResponse("error", this, [this, response], options);
-                    }).catch(() => {
-                        fireResponse("error", this, [this, response], options);
-                    });
-                } else {
-                    fireResponse("error", this, [this, response], options);
-                }
-            });
+    _request(options){
+      this[_requestInstance].send(this, options);
     }
+
 
     fetch(options = {}) {
         options.method = "GET";
