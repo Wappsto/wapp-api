@@ -5,6 +5,10 @@ var start = function(session) {
     const http = require("http");
     // Getting token, session and installation Id
     let sessionID = session || process.env.sessionID;
+    if(!sessionID){
+      console.error("Wappsto console requires sessionID to work");
+      return;
+    }
 
     // Extsync request options
     const options = {

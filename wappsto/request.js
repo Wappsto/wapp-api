@@ -39,7 +39,7 @@ class WappstoRequest extends Request {
     }
     let self = this;
     let requestOptions;
-    if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) ||options.url.indexOf("quantity") !== -1)){
+    if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
       let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
       let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
       requestOptions = {
@@ -50,7 +50,6 @@ class WappstoRequest extends Request {
             self._waitFor[searchIn] = [...(self._waitFor[searchIn] || []), { context: col, options: options }];
           } else {
             callStatusChange.call(col, options, STATUS.ACCEPTED, col, response);
-            console.log(options.subscribe);
             if(options.subscribe === true && self._wStream){
               self._wStream.subscribe(col);
             }
