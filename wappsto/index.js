@@ -21,13 +21,12 @@ class Wappsto {
     } else {
         this[_requestInstance] = new Request(request, this);
     }
-    this[_util] = this[_requestInstance][_util];
     this[_wappstoModels] = new Models(this[_requestInstance]);
     this[_Stream] = Stream;
   }
 
   get util() {
-    return this[_util];
+    return this[_requestInstance][_util];
   }
 
   get models() {
@@ -86,12 +85,7 @@ class Wappsto {
 
       let requestOptions = {
         ...options,
-        url: this[_util].baseUrl + "/" + searchIn + "?" + data,
-        error: (col, response) => {
-          if(options.error){
-            options.error(response);
-          }
-        }
+        url: this.util.baseUrl + "/" + searchIn + "?" + data
       };
       collection.fetch(requestOptions);
   }
@@ -174,21 +168,13 @@ class Wappsto {
             success: () => {
               this._startStream(stream, models, options);
             },
-            error: (col, response) => {
-              if(options.error){
-                options.error(response);
-              }
-            }
+            error: options.error
           });
         } else {
           this._createStream(streamJSON, models, options);
         }
       },
-      error: (response) => {
-        if(options.error){
-          options.error(response);
-        }
-      }
+      error: options.error
     });
   }
 
@@ -198,11 +184,7 @@ class Wappsto {
         success: () => {
             this._startStream(stream, models, options);
         },
-        error: (model, response) => {
-            if(options.error){
-              options.error(response);
-            }
-        }
+        error: options.error
     });
   }
 

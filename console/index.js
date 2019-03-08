@@ -1,10 +1,10 @@
 // Saving console functions
 let defaultConsole = Object.assign({}, console);
 
-var start = function() {
+var start = function(session) {
     const http = require("http");
     // Getting token, session and installation Id
-    let { sessionID } = process.env;
+    let sessionID = session || process.env.sessionID;
 
     // Extsync request options
     const options = {

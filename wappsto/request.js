@@ -95,9 +95,9 @@ class WappstoRequest extends Request {
     if(this._wStreamPromise){
       this._wStreamPromise.then(() => {
         this._makeRequest(context, requestOptions, options);
-      }).catch((response) => {
+      }).catch((context, response) => {
         if(options.error){
-          options.error(response);
+          options.error(context, response);
         }
       });
     } else {
@@ -113,11 +113,11 @@ class WappstoRequest extends Request {
             resolve(wStream);
             this._makeRequest(context, requestOptions, options);
           },
-          error: (response) => {
+          error: (context, response) => {
             this._wStreamPromise = null;
-            reject(response);
+            reject(context, response);
             if(options.error){
-              options.error(response);
+              options.error(context, response);
             }
           }
         });

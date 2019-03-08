@@ -10,6 +10,10 @@ class Request {
     this.send = this.send.bind(this);
   }
 
+  get util(){
+    return this[_util];
+  }
+
   send(context, options){
     if(context instanceof Collection){
       this._collection(context, options);
@@ -30,6 +34,7 @@ class Request {
         return response.json();
       })
       .then((jsonResponse) => {
+        responseFired = true;
         if (options.parse !== false) {
           let data = model.parse(jsonResponse);
           model.set(data, options);
@@ -41,6 +46,7 @@ class Request {
         if (responseFired) {
           Util.throw(response);
         }
+        responseFired = true;
         if (response.text) {
           response.text().then((text) => {
             response.responseText = text;
@@ -49,14 +55,11 @@ class Request {
             } catch (error) {
 
             }
-            responseFired = true;
             this._fireResponse("error", model, [model, response], options);
           }).catch(() => {
-            responseFired = true;
             this._fireResponse("error", model, [model, response], options);
           });
         } else {
-          responseFired = true;
           this._fireResponse("error", model, [model, response], options);
         }
       });
@@ -74,16 +77,17 @@ class Request {
         return response.json();
       })
       .then((jsonResponse) => {
+        responseFired = true;
         let data = collection.parse(jsonResponse);
         collection.add(data);
         savedResponse.responseJSON = jsonResponse;
-        responseFired = true;
         this._fireResponse("success", collection, [collection, jsonResponse, savedResponse], options);
       })
       .catch((response) => {
         if (responseFired) {
           Util.throw(response);
         }
+        responseFired = true;
         if (response.text) {
           response.text().then((text) => {
             response.responseText = text;
@@ -92,14 +96,11 @@ class Request {
             } catch (error) {
 
             }
-            responseFired = true;
             this._fireResponse("error", collection, [collection, response], options);
           }).catch(() => {
-            responseFired = true;
             this._fireResponse("error", collection, [collection, response], options);
           });
         } else {
-          responseFired = true;
           this._fireResponse("error", collection, [collection, response], options);
         }
       });
@@ -115,8 +116,8 @@ class Request {
       }
     }
     let headers = options["headers"] || {}
-    if (this[_util].session && !headers["x-session"]) {
-      headers["x-session"] = this[_util].session;
+    if (this.util.session && !headers["x-session"]) {
+      headers["x-session"] = this.util.session;
     }
     headers["Content-Type"] = "application/json";
     headers["Accept"] = "application/json";

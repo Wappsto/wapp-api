@@ -17,46 +17,6 @@ let toCreate = {
     Collection: require('./generic-collection')
 }
 
-/*
-// The only way to keep names, at least for now
-let extendClass = (c, key) => {
-  switch (key) {
-    case "State":
-      return class State extends c{};
-      break;
-    case "Value":
-      return class Value extends c{};
-      break;
-    case "Device":
-      return class Device extends c{};
-      break;
-    case "Network":
-      return class Network extends c{};
-      break;
-    case "Stream":
-      return class Stream extends c{};
-      break;
-    case "Set":
-      return class Set extends c{};
-      break;
-    case "Notification":
-      return class Notification extends c{};
-      break;
-    case "Data":
-      return class Data extends c{};
-      break;
-    case "Model":
-      return class Model extends c{};
-      break;
-    case "Collection":
-      return class Collection extends c{};
-      break;
-    default:
-      throw new Error("undefined class name");
-      break;
-  }
-}*/
-
 class WappstoModels {
     constructor(request) {
         let self = this;
@@ -65,7 +25,6 @@ class WappstoModels {
         } else {
             this[_requestInstance] = new Request(request);
         }
-        this[_util] = this[_requestInstance][_util];
         for (let key in toCreate) {
             this[key] = function(data) {
                 if (!(this instanceof self[key])) {
@@ -77,7 +36,7 @@ class WappstoModels {
     }
 
     get util() {
-        return this[_util];
+        return this[_requestInstance][_util];
     }
 }
 

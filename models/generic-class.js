@@ -23,13 +23,12 @@ class Generic extends EventEmitter {
         } else {
           this[_requestInstance] = new Request(request);
         }
-        this[_util] = this[_requestInstance][_util];
 
         // Initializing attributes
         this.attributes = {};
         if(!attributes.hasOwnProperty("meta")){
             this.attributes.meta = {
-                version: this[_util].version
+                version: this.util.version
             }
         }
 
@@ -74,7 +73,7 @@ class Generic extends EventEmitter {
     }
 
     get util(){
-        return this[_util];
+        return this[_requestInstance][_util];
     }
 
     _createRelationCollection({
@@ -259,13 +258,13 @@ class Generic extends EventEmitter {
         }
         return {
             url: function(){
-                return self[_util].baseUrl;
+                return self.util.baseUrl;
             }
         };
     }
 
     url(options = {}) {
-        let startUrl = (options.full !== false && this.parent()) ? this.parent().url() : this[_util].baseUrl;
+        let startUrl = (options.full !== false && this.parent()) ? this.parent().url() : this.util.baseUrl;
         if (this.get("meta.id")) {
             return startUrl + '/' + this[_name] + '/' + this.get("meta").id;
         } else {

@@ -30,7 +30,6 @@ class Collection extends EventEmitter {
         } else {
             this[_requestInstance] = new Request(request);
         }
-        this[_util] = this[_requestInstance][_util];
         this.models = [];
 
         this.add = this.push;
@@ -252,7 +251,7 @@ class Collection extends EventEmitter {
     }
 
     url() {
-        let url = this.parent() ? this.parent().url() : this[_util].baseUrl;
+        let url = this.parent() ? this.parent().url() : this.util.baseUrl;
         if(!this[_className] && this[_class]){
             let instance = new this[_class];
             this[_className] = instance.constructor.name.charAt(0).toLowerCase() + instance.constructor.name.slice(1)
@@ -261,6 +260,10 @@ class Collection extends EventEmitter {
             url += "/" + this[_className];
         }
         return url;
+    }
+
+    get util(){
+        return this[_requestInstance][_util];
     }
 
     get length() {

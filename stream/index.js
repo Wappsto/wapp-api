@@ -30,7 +30,7 @@ class WappstoStream extends EventEmitter {
 
     open() {
         if (this.stream && this.stream.get("meta.id") && WebSocket) {
-            let url = this.stream.url() + '?x-session=' + this.stream[_util].session;
+            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
             if (!url.startsWith("http") && window && window.location && window.location.origin) {
                 url = window.location.origin + url;
             }
