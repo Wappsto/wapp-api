@@ -372,11 +372,15 @@ class Collection extends EventEmitter {
     }
 
     push(data, options = {}) {
+        let results = [];
+        let isArray = true;
         if (!Array.isArray(data)) {
             data = [data];
+            isArray = false;
         }
         data.forEach((element, index) => {
             if(this.models.includes(element)){
+                results.push(element);
                 return;
             }
             let found = this.find(element, options);
@@ -386,21 +390,23 @@ class Collection extends EventEmitter {
                 } else {
                     Object.assign(found, element);
                 }
-            } else if (element instanceof Generic) {
-                // Maybe check if it is there
-                element[_collections].push(this);
-                this._pushToModels(element, options);
+                results.push(found);
             } else if (this[_class]) {
                 let newInstance = new this[_class](element, this[_requestInstance]);
                 newInstance[_collections].push(this);
                 this._pushToModels(newInstance, options);
+                results.push(newInstance);
             } else {
-                element[_collections] = [this];
+                if(!element[_collections]){
+                  element[_collections] = [];
+                }
+                element[_collections].push(this);
                 this._pushToModels(element, options);
+                results.push(element);
             }
         });
 
-        return this;
+        return isArray ? results : results[0];
     }
 
     _getLookElement(element){
@@ -443,7 +449,7 @@ class Collection extends EventEmitter {
         });
         if (index != -1) {
             let result = this.models.splice(index, 1);
-            this.emit("remove", result, options);
+            this.emit("remove", this, result, options);
             if(result instanceof Generic){
                 result.removeListener("destroy", this._onModelDestroy);
             }
@@ -1035,6 +1041,8 @@ class WappstoStream extends EventEmitter {
         super();
         this.models = {};
         this.close = this.close.bind(this);
+        this._collectionAddCallback = this._collectionAddCallback.bind(this);
+        this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
         this.on('error', () => {});
         if (stream instanceof Stream) {
             this[_stream] = stream;
@@ -1296,19 +1304,19 @@ class WappstoStream extends EventEmitter {
     }
 
     addModel(model) {
-        this._forAllModels(model, this._addModelToCache.bind(this));
+        this._forAllModels(model, this._addModelToCache.bind(this), this._addCollectionListener.bind(this));
     }
 
     removeModel(model) {
-        this._forAllModels(model, this._removeModelFromCache.bind(this));
+        this._forAllModels(model, this._removeModelFromCache.bind(this), this._removeCollectionListener.bind(this));
     }
 
-    _forAllModels(model, func) {
+    _forAllModels(model, modelFunc, collectionFunc) {
         let arr = [model];
         while (arr.length != 0) {
             let temp = [];
             arr.forEach((m) => {
-                func(m);
+                modelFunc(m);
                 if (m.constructor[_relations]) {
                     m.constructor[_relations].forEach(({
                         key,
@@ -1318,7 +1326,9 @@ class WappstoStream extends EventEmitter {
                         if (type === Util.type.One) {
                             temp = [...temp, m.get(key)];
                         } else if (type === Util.type.Many) {
-                            temp = [...temp, ...m.get(key).models];
+                            let col = m.get(key);
+                            collectionFunc(col);
+                            temp = [...temp, ...col.models];
                         }
                     });
                 }
@@ -1349,6 +1359,24 @@ class WappstoStream extends EventEmitter {
             }
           }
         }
+    }
+
+    _addCollectionListener(collection){
+        collection.on("add", this._collectionAddCallback);
+        collection.on("remove", this._collectionRemoveCallback);
+    }
+
+    _removeCollectionListener(){
+        collection.off("add", this._collectionAddCallback);
+        collection.off("remove", this._collectionRemoveCallback);
+    }
+
+    _collectionAddCallback(collection, model, options){
+        this.addModel(model);
+    }
+
+    _collectionRemoveCallback(collection, model, options){
+        this.removeModel(model);
     }
 
     _updateSubscriptions(subscription, options) {

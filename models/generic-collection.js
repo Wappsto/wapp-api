@@ -60,11 +60,15 @@ class Collection extends EventEmitter {
     }
 
     push(data, options = {}) {
+        let results = [];
+        let isArray = true;
         if (!Array.isArray(data)) {
             data = [data];
+            isArray = false;
         }
         data.forEach((element, index) => {
             if(this.models.includes(element)){
+                results.push(element);
                 return;
             }
             let found = this.find(element, options);
@@ -74,21 +78,23 @@ class Collection extends EventEmitter {
                 } else {
                     Object.assign(found, element);
                 }
-            } else if (element instanceof Generic) {
-                // Maybe check if it is there
-                element[_collections].push(this);
-                this._pushToModels(element, options);
+                results.push(found);
             } else if (this[_class]) {
                 let newInstance = new this[_class](element, this[_requestInstance]);
                 newInstance[_collections].push(this);
                 this._pushToModels(newInstance, options);
+                results.push(newInstance);
             } else {
-                element[_collections] = [this];
+                if(!element[_collections]){
+                  element[_collections] = [];
+                }
+                element[_collections].push(this);
                 this._pushToModels(element, options);
+                results.push(element);
             }
         });
 
-        return this;
+        return isArray ? results : results[0];
     }
 
     _getLookElement(element){
@@ -131,7 +137,7 @@ class Collection extends EventEmitter {
         });
         if (index != -1) {
             let result = this.models.splice(index, 1);
-            this.emit("remove", result, options);
+            this.emit("remove", this, result, options);
             if(result instanceof Generic){
                 result.removeListener("destroy", this._onModelDestroy);
             }

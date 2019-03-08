@@ -17,6 +17,8 @@ class WappstoStream extends EventEmitter {
         super();
         this.models = {};
         this.close = this.close.bind(this);
+        this._collectionAddCallback = this._collectionAddCallback.bind(this);
+        this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
         this.on('error', () => {});
         if (stream instanceof Stream) {
             this[_stream] = stream;
@@ -278,19 +280,19 @@ class WappstoStream extends EventEmitter {
     }
 
     addModel(model) {
-        this._forAllModels(model, this._addModelToCache.bind(this));
+        this._forAllModels(model, this._addModelToCache.bind(this), this._addCollectionListener.bind(this));
     }
 
     removeModel(model) {
-        this._forAllModels(model, this._removeModelFromCache.bind(this));
+        this._forAllModels(model, this._removeModelFromCache.bind(this), this._removeCollectionListener.bind(this));
     }
 
-    _forAllModels(model, func) {
+    _forAllModels(model, modelFunc, collectionFunc) {
         let arr = [model];
         while (arr.length != 0) {
             let temp = [];
             arr.forEach((m) => {
-                func(m);
+                modelFunc(m);
                 if (m.constructor[_relations]) {
                     m.constructor[_relations].forEach(({
                         key,
@@ -300,7 +302,9 @@ class WappstoStream extends EventEmitter {
                         if (type === Util.type.One) {
                             temp = [...temp, m.get(key)];
                         } else if (type === Util.type.Many) {
-                            temp = [...temp, ...m.get(key).models];
+                            let col = m.get(key);
+                            collectionFunc(col);
+                            temp = [...temp, ...col.models];
                         }
                     });
                 }
@@ -331,6 +335,24 @@ class WappstoStream extends EventEmitter {
             }
           }
         }
+    }
+
+    _addCollectionListener(collection){
+        collection.on("add", this._collectionAddCallback);
+        collection.on("remove", this._collectionRemoveCallback);
+    }
+
+    _removeCollectionListener(){
+        collection.off("add", this._collectionAddCallback);
+        collection.off("remove", this._collectionRemoveCallback);
+    }
+
+    _collectionAddCallback(collection, model, options){
+        this.addModel(model);
+    }
+
+    _collectionRemoveCallback(collection, model, options){
+        this.removeModel(model);
     }
 
     _updateSubscriptions(subscription, options) {
