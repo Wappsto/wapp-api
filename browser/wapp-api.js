@@ -262,10 +262,8 @@ class Generic extends EventEmitter {
                 options.method = "POST";
                 options.create = true;
             }
-            options.body = JSON.stringify({
-                ...this.toJSON(options),
-                ...data
-            });
+            let body = Object.assign({}, this.toJSON(options), data);
+            options.body = JSON.stringify(body);
         }
         return this._request(options);
     }
