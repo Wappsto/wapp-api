@@ -83,10 +83,9 @@ class Wappsto {
         collection[_class] = M;
       }
 
-      let requestOptions = {
-        ...options,
+      let requestOptions = Object.assign({}, options, {
         url: this.util.baseUrl + "/" + searchIn + "?" + data
-      };
+      });
       collection.fetch(requestOptions);
   }
 

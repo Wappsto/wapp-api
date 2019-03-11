@@ -1704,10 +1704,9 @@ class Wappsto {
         collection[_class] = M;
       }
 
-      let requestOptions = {
-        ...options,
+      let requestOptions = Object.assign({}, options, {
         url: this.util.baseUrl + "/" + searchIn + "?" + data
-      };
+      });
       collection.fetch(requestOptions);
   }
 
@@ -1876,8 +1875,7 @@ class WappstoRequest extends Request {
     if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
       let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
       let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
-      requestOptions = {
-        ...options,
+      requestOptions = Object.assign({}, options, {
         success: (col, response) => {
           if(col.length < quantity){
             callStatusChange.call(col, options, STATUS.WAITING);
@@ -1893,7 +1891,7 @@ class WappstoRequest extends Request {
           }
         },
         error: options.error
-      }
+      });
     } else {
       requestOptions = this._getPrecisePermissionOptions(options);
     }
@@ -1902,8 +1900,7 @@ class WappstoRequest extends Request {
 
   _getPrecisePermissionOptions(options){
     let self = this;
-    return {
-        ...options,
+    return Object.assign({}, options, {
         success: (context, jsonResponse, xhrResponse) => {
           callStatusChange.call(context, options, STATUS.ACCEPTED);
             if(options.subscribe === true && self._wStream){
@@ -1921,7 +1918,7 @@ class WappstoRequest extends Request {
                 options.error.call(context, response);
             }
         }
-    }
+    });
   }
 
   _wrapRequest(context, requestOptions, options){
