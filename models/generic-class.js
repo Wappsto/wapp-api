@@ -230,7 +230,6 @@ class Generic extends EventEmitter {
             }
             let body = Object.assign({}, this.toJSON(options), data);
             options.body = JSON.stringify(body);
-
         }
         return this._request(options);
     }
