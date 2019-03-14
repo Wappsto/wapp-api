@@ -31,7 +31,7 @@ Device["_relations"] = [{
 
 module.exports = Device;
 
-},{"../util":18,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
 const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
@@ -307,7 +307,7 @@ class Generic extends EventEmitter {
 
 module.exports = Generic;
 
-},{"../util":18,"./generic-collection":4,"./request":8,"events":26,"node-fetch":13}],4:[function(require,module,exports){
+},{"../util":56,"./generic-collection":4,"./request":8,"events":18,"node-fetch":24}],4:[function(require,module,exports){
 const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
@@ -616,7 +616,7 @@ class Collection extends EventEmitter {
 
 module.exports = Collection;
 
-},{"../util":18,"./generic-class":3,"./request":8,"events":26,"node-fetch":13}],5:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./request":8,"events":18,"node-fetch":24}],5:[function(require,module,exports){
 const Request = require('./request');
 const Util = require('../util');
 
@@ -661,7 +661,7 @@ class WappstoModels {
 
 module.exports = WappstoModels;
 
-},{"../util":18,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
+},{"../util":56,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Device = require('./device');
@@ -687,7 +687,7 @@ Network["_relations"] = [{
 
 module.exports = Network;
 
-},{"../util":18,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
+},{"../util":56,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 
@@ -701,7 +701,7 @@ Notification[_pickAttributes] = {
 
 module.exports = Notification;
 
-},{"../util":18,"./generic-class":3}],8:[function(require,module,exports){
+},{"../util":56,"./generic-class":3}],8:[function(require,module,exports){
 const fetch = require('node-fetch');
 const Collection = require('./generic-collection');
 const Util = require('../util');
@@ -844,7 +844,7 @@ class Request {
 
 module.exports = Request;
 
-},{"../util":18,"./generic-collection":4,"node-fetch":13}],9:[function(require,module,exports){
+},{"../util":56,"./generic-collection":4,"node-fetch":24}],9:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Collection = require('./generic-collection');
@@ -928,7 +928,7 @@ Set[_pickAttributes] = {
 
 module.exports = Set;
 
-},{"../util":18,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
 const Generic = require('./generic-class');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
@@ -959,7 +959,7 @@ Stream[_pickAttributes] = {
 
 module.exports = Stream;
 
-},{"../util":18,"./generic-class":3}],12:[function(require,module,exports){
+},{"../util":56,"./generic-class":3}],12:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require("./generic-class");
 const State = require('./state');
@@ -985,1002 +985,7 @@ Value["_relations"] = [{
 
 module.exports = Value;
 
-},{"../util":18,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
-"use strict";
-
-// ref: https://github.com/tc39/proposal-global
-var getGlobal = function () {
-	// the only reliable means to get the global object is
-	// `Function('return this')()`
-	// However, this causes CSP violations in Chrome apps.
-	if (typeof self !== 'undefined') { return self; }
-	if (typeof window !== 'undefined') { return window; }
-	if (typeof global !== 'undefined') { return global; }
-	throw new Error('unable to locate global object');
-}
-
-var global = getGlobal();
-
-module.exports = exports = global.fetch;
-
-// Needed for TypeScript and Webpack.
-exports.default = global.fetch.bind(global);
-
-exports.Headers = global.Headers;
-exports.Request = global.Request;
-exports.Response = global.Response;
-},{}],14:[function(require,module,exports){
-'use strict';
-
-module.exports = function() {
-  throw new Error(
-    'ws does not work in the browser. Browser clients must use the native ' +
-      'WebSocket object'
-  );
-};
-
-},{}],15:[function(require,module,exports){
-const WebSocket = require('./stream-polyfill');
-const Stream = require('../models/stream');
-const Util = require('../util');
-const Tracer = require('../tracer');
-const EventEmitter = require('events');
-const Model = require('../models/generic-class');
-const Collection = require('../models/generic-collection');
-
-const _stream = Symbol("stream");
-const _source = Symbol("source");
-const _oldSource = Symbol("oldSource");
-const _util = Symbol.for("generic-util");
-const _relations = "_relations";
-
-class WappstoStream extends EventEmitter {
-    constructor(stream) {
-        super();
-        this.models = {};
-        this.close = this.close.bind(this);
-        this._collectionAddCallback = this._collectionAddCallback.bind(this);
-        this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
-        this.on('error', () => {});
-        if (stream instanceof Stream) {
-            this[_stream] = stream;
-            stream.on("destoy", this.close);
-        }
-    }
-
-    get stream() {
-        return this[_stream];
-    }
-
-    open() {
-        if (this.stream && this.stream.get("meta.id") && WebSocket) {
-            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
-            if (!url.startsWith("http") && window && window.location && window.location.origin) {
-                url = window.location.origin + url;
-            }
-            let ws = new WebSocket(url.replace(/^http/, 'ws'));
-            this._addEventListeners(ws);
-            this[_source] = ws;
-        } else {
-            console.error("cannot connect, stream model not found");
-        }
-    }
-
-    close() {
-        if (this[_source]) {
-            this[_source].ignoreReconnect = true;
-            this[_source].close();
-        }
-    }
-
-    _reconnect() {
-        if (this[_source]) {
-            if (this[_oldSource] && !this[_source].ignoreReconnect) {
-                this[_source].ignoreReconnect = true;
-                this[_source].close();
-            } else {
-                this[_oldSource] = this[_source];
-            }
-            this.open();
-        }
-    }
-
-    _addEventListeners(source) {
-        let self = this,
-            url = self.stream.url().replace(/^http/, 'ws');
-
-        let timeout = setTimeout(() => {
-            source.ignoreReconnect = true;
-            source.close();
-            self._reconnect();
-        }, 5000);
-
-        let reconnect = () => {
-            if (!source.ignoreReconnect) {
-                source.ignoreReconnect = true;
-                setTimeout(function() {
-                    self._reconnect();
-                }, 5000);
-            }
-        }
-
-        source.addEventListener('message', function(e) {
-            let message;
-            try {
-                message = JSON.parse(e.data);
-            } catch (e) {
-                self.emit('message', e);
-                return;
-            }
-            self.emit('message', e);
-            message.forEach((msg) => {
-                if(msg.meta_object.type === 'extsync' && msg.extsync.uri === 'extsync/wappsto/editor/console'){
-                    return;
-                }
-                let traceId = self._checkAndSendTrace(msg);
-                self._handleMessage(msg, traceId);
-            });
-        }, false);
-
-        source.addEventListener('open', function(e) {
-            // Connection was opened.
-            console.log('stream open: ' + url);
-            clearTimeout(timeout);
-            self.emit('open', e);
-            // disconnect from old source
-            if (self[_oldSource]) {
-                self[_oldSource].ignoreReconnect = true;
-                self[_oldSource].close();
-                self[_oldSource] = null;
-            }
-        }, false);
-
-        source.addEventListener('error', function(e) {
-            try {
-              self.emit('error', e);
-            } catch (e) {
-              self.emit('error');
-            }
-            console.log('stream error: ' + url);
-        }, false);
-
-        source.addEventListener('close', function(e) {
-            console.log('stream closed: ' + url);
-            clearTimeout(timeout);
-            self.emit('close', e);
-            reconnect();
-        }, false);
-    }
-
-    _checkAndSendTrace(message) {
-        if (message.hasOwnProperty('meta') && message.meta.hasOwnProperty('trace')) {
-            return Tracer.sendTrace(message.meta.trace, null, null, {
-                'stream_id': message.meta.id
-            });
-        }
-    }
-
-    _handleMessage(message, traceId) {
-        let id, models, options, event = message.event;
-        if (traceId) {
-            options = {
-                trace: traceId
-            };
-        }
-        switch (event) {
-            case "create":
-                if (message.meta_object.type === "notification") {
-                    this._handleNotification(message.notification, options);
-                } else {
-                    if(!this._updateModel(message, options)){
-                        id = message.path.split("/");
-                        let last = id[id.length - 1];
-                        id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
-                        models = this.models[id];
-                        if (models) {
-                          let type = message.meta_object.type;
-                          models.forEach((model) => {
-                            let newModel = model.get(type).add(message[type], options);
-                            this.addModel(newModel);
-                          });
-                        }
-                    }
-                }
-                break;
-            case "update":
-                this._updateModel(message, options);
-                break;
-            case "delete":
-                id = message.meta_object.id;
-                models = this.models[id];
-                if (models) {
-                    models.forEach((model) => {
-                      model.emit("destroy", model, options);
-                      this.removeModel(model);
-                    });
-                }
-                break;
-
-        }
-    }
-
-    _updateModel(message, options) {
-        let id = message.meta_object.id;
-        let models = this.models[id];
-        if (models) {
-            models.forEach((model) => {
-              model.emit("stream:message", model, message[message.meta_object.type], message);
-              model.set(message[message.meta_object.type], options);
-            });
-            return true;
-        }
-        return false;
-    }
-
-    _handleNotification(notification, options) {
-        switch (notification.base.code) {
-            case 1100004:
-                this.emit("permission:added", notification.base.type_ids, notification.base.ids, options);
-                break;
-            case 1100013:
-                this.emit("permission:updated", notification.base.type_ids, notification.base.ids, options);
-                break;
-            case 1100006:
-                this.emit("permission:removed", notification.base.type_ids, notification.base.ids, options);
-                break;
-            case 1100007:
-                this.emit("permission:revoked", notification.base.type_ids, notification.base.ids, options);
-                break;
-
-        }
-    }
-
-    subscribe(arr, options = {}) {
-        if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
-            return;
-        }
-        if(arr.constructor !== Array && !(arr instanceof Collection)){
-            arr = [arr];
-        }
-        let subscriptions = [];
-        let models = [];
-        arr.forEach((obj) => {
-            let { path, isModel } = this._getPath(obj);
-            if(path){
-                subscriptions.push(path);
-                if(isModel){
-                    models.push(obj);
-                }
-            }
-        });
-        if(subscriptions.length === 0) return;
-        let requestOptions = Object.assign({}, options);
-        requestOptions.success = () => {
-            models.forEach((obj) => this.addModel(obj));
-            if (options.success) {
-                options.success.apply(this, arguments);
-            }
-        }
-        return this._updateSubscriptions([...this.stream.get("subscription"), ...subscriptions], requestOptions);
-    }
-
-    unsubscribe(arr, options) {
-        if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
-            return;
-        }
-        if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
-            arr = [arr];
-        }
-        let update = false;
-        let subscriptions = [...this.stream.get("subscription")];
-        arr.forEach((obj) => {
-            let { path, isModel } = this._getPath(obj);
-            if(path){
-                let index = subscriptions.indexOf(path);
-                if (isModel) {
-                    this.removeModel(obj);
-                }
-                if (index !== -1) {
-                    subscriptions.splice(index, 1);
-                    update = true;
-                }
-            }
-        });
-        if(update){
-            return this._updateSubscriptions(subscriptions, options);
-        } else if(options.success){
-            options.success.call(this.stream, this.stream, this.stream.toJSON(), {});
-        }
-    }
-
-    _getModelUrl(model) {
-        return model.url({
-            full: false
-        }).replace(model.util.baseUrl, "");
-    }
-
-    addModel(model) {
-        this._forAllModels(model, this._addModelToCache.bind(this), this._addCollectionListener.bind(this));
-    }
-
-    removeModel(model) {
-        this._forAllModels(model, this._removeModelFromCache.bind(this), this._removeCollectionListener.bind(this));
-    }
-
-    _forAllModels(model, modelFunc, collectionFunc) {
-        let arr = [model];
-        while (arr.length != 0) {
-            let temp = [];
-            arr.forEach((m) => {
-                modelFunc(m);
-                if (m.constructor[_relations]) {
-                    m.constructor[_relations].forEach(({
-                        key,
-                        type,
-                        relatedClass
-                    }) => {
-                        if (type === Util.type.One) {
-                            temp = [...temp, m.get(key)];
-                        } else if (type === Util.type.Many) {
-                            let col = m.get(key);
-                            collectionFunc(col);
-                            temp = [...temp, ...col.models];
-                        }
-                    });
-                }
-            });
-            arr = temp;
-        }
-    }
-
-    _addModelToCache(model) {
-        let id = model.get("meta.id");
-        if (!this.models.hasOwnProperty(id)) {
-          this.models[id] = [model];
-        } else {
-          if(this.models[id].indexOf(model) === -1){
-            this.models[id].push(model);
-          }
-        }
-    }
-
-    _removeModelFromCache(model) {
-        let id = model.get("meta.id");
-        if(this.models[id]){
-          let index = this.models[id].indexOf(model);
-          if(index !== -1){
-            this.models[id].splice(index, 1);
-            if(this.models[id].length === 0){
-              delete this.models[id];
-            }
-          }
-        }
-    }
-
-    _addCollectionListener(collection){
-        collection.on("add", this._collectionAddCallback);
-        collection.on("remove", this._collectionRemoveCallback);
-    }
-
-    _removeCollectionListener(){
-        collection.off("add", this._collectionAddCallback);
-        collection.off("remove", this._collectionRemoveCallback);
-    }
-
-    _collectionAddCallback(collection, model, options){
-        this.addModel(model);
-    }
-
-    _collectionRemoveCallback(collection, model, options){
-        this.removeModel(model);
-    }
-
-    _updateSubscriptions(subscription, options) {
-        this.stream.set("subscription", subscription);
-        return this.stream.save({
-            subscription,
-            full: true
-        }, {
-            wait: true,
-            patch: true,
-            success: options.success,
-            error: options.error,
-            complete: options.complete
-        });
-    }
-
-    _getPath(obj) {
-        let isObject = obj instanceof Object;
-        let isString = typeof(obj) === "string";
-        if (!isObject && !isString) {
-            console.error("argument must be a string, an object or a class");
-            return {
-                path: undefined,
-                isModel: false,
-                isString: false
-            };
-        }
-        let path;
-        let isModel = obj.constructor.prototype instanceof Model;
-        if (isModel) {
-            path = this._getModelUrl(obj);
-        } else if (isObject) {
-            path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
-        } else {
-            path = obj;
-        }
-        return {
-            path,
-            isModel,
-            isString
-        };
-    }
-}
-
-module.exports = WappstoStream;
-
-},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":17,"../util":18,"./stream-polyfill":16,"events":26}],16:[function(require,module,exports){
-let WebSocket;
-if(typeof window === 'object' && window.document && window.WebSocket){
-    WebSocket = window.WebSocket;
-} else {
-    WebSocket = require('ws');
-}
-
-module.exports = WebSocket;
-
-},{"ws":14}],17:[function(require,module,exports){
-const http = require('http');
-const https = require('https');
-
-let tracer = {
-    params: {
-        name: null,
-        parent: null
-    },
-    sendTrace: function(parent, id, name, data, status) {
-        if(!name){
-            if (this.params && this.params.name) {
-                name = this.params.name;
-            } else {
-                name = "WS_APP_BACKGROUND";
-            }
-        }
-        if (id === null) {
-            id = 'WS_APP_BACKGROUND_' + Math.floor(Math.random() * 1000000 + 1);
-        }
-        var str = '';
-        for (let k in data) {
-            let v = data[k];
-            if (typeof v !== 'string') {
-                v = JSON.stringify(v);
-            }
-            str += '&' + k + '=' + encodeURIComponent(v);
-        }
-        if (!status) {
-            status = 'ok';
-        }
-        name = encodeURIComponent(name);
-        var uri = 'id=' + id + '&name=' + name + '&status=' + status + str;
-        if (parent) {
-            uri = 'parent=' + parent + '&' + uri;
-        } else if (this.params && this.params.parent) {
-            uri = 'parent=' + this.params.parent + '&' + uri;
-        }
-        https.get('https://tracer.iot.seluxit.com/trace?' + uri);
-        return id;
-    }
-}
-
-// Overriding http and https
-const originalRequest = {
-    http: {
-        request: http.request,
-        get: http.get
-    },
-    https: {
-        request: https.request,
-        get: https.get
-    }
-};
-const checkAndSendTrace = function(req = {}, options = {}) {
-    let path, method, nodeName;
-    if (req.constructor === String) {
-        path = req.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
-        if(path.indexOf('/') !== -1){
-            path = path.split('/').slice(1).join('/') || '';
-        } else {
-            path = path.split('?')[1] || '';
-        }
-        method = options.method || 'GET';
-    } else if(Object.prototype.toString.call(req) === "[object Object]"){
-        path = req.path;
-        method = req.method || 'GET';
-        options = req;
-    }
-    if(tracer.params && tracer.params.name){
-        nodeName = tracer.params.name + "_" + method + '_' + path;
-    } else {
-        nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
-    }
-    if(!path){
-      return;
-    }
-    if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
-        // Removing trace_parent from path
-        var splitPath = path.split('?');
-        var queryData = {};
-        var tracing = false;
-        if (splitPath.length > 1) {
-            // Converting query to object
-            var query = splitPath[1].split('&');
-            var origin = splitPath[0];
-            query.forEach(function(q) {
-                q = q.split('=');
-                queryData[q[0]] = q[1];
-            });
-
-            var parentNode = queryData['trace_parent'];
-            nodeId = queryData['trace'];
-            if (nodeId) {
-                // Clean and reconstruct
-                delete queryData['trace_parent'];
-                var newQuery = '';
-                for(let key in queryData){
-                    newQuery += key + '=' + queryData[key] + '&';
-                }
-                if (newQuery.length) {
-                    newQuery = '?' + newQuery;
-                    newQuery = newQuery.slice(0, -1);
-                }
-
-                path = origin + newQuery;
-                var splitOrigin = origin.split('/');
-                tracer.sendTrace(parentNode, nodeId, nodeName, { query: queryData }, 'ok');
-                tracing = true;
-            }
-        }
-
-        if (!tracing && tracer.globalTrace === true && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
-            var id = tracer.sendTrace(parentNode, null, nodeName, { method, path }, 'ok');
-            path += '?trace=' + id;
-        }
-
-        options.path = path;
-    }
-};
-const overrideRequest = function(protocol, strName) {
-    protocol.request = function(req, options) {
-        checkAndSendTrace(req, options);
-        return originalRequest[strName].request.apply(this, arguments);
-    }
-    protocol.get = function(req, options) {
-        checkAndSendTrace(req, options);
-        return originalRequest[strName].get.apply(this, arguments);
-    }
-};
-
-overrideRequest(http, 'http');
-overrideRequest(https, 'https');
-
-module.exports = tracer;
-
-},{"http":49,"https":27}],18:[function(require,module,exports){
-(function (process){
-let baseUrl, session;
-if(typeof window === 'object' && window.document){
-    baseUrl = "/services";
-    session = window.sessionStorage.getItem("sessionID");
-} else {
-    baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
-    session = process.env.sessionID;
-}
-
-module.exports = {
-    baseUrl: baseUrl,
-    version: "2.0",
-    type: {
-        One: Symbol.for('one'),
-        Many: Symbol.for('many')
-    },
-    isUUID: function(data) {
-        try {
-            if (data.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-b8-9][a-f0-9]{3}-[a-f0-9]{12}$/i).length > 0) {
-                return true;
-            }
-        } catch (err) {}
-        return false;
-    },
-    extend: function(util) {
-        let newUtil = Object.assign({}, util);
-        if (!newUtil.session) {
-            if(!session){
-                throw new Error("session is required");
-            }
-            newUtil.session = session;
-        }
-        if (!newUtil.version) {
-            newUtil.version = this.version;
-        }
-        if (!newUtil.baseUrl) {
-            newUtil.baseUrl = this.baseUrl;
-        }
-        return newUtil;
-    },
-    throw: function(response){
-      process.on('unhandledRejection', up => { throw up });
-      throw response;
-    }
-}
-
-}).call(this,require('_process'))
-},{"_process":33}],19:[function(require,module,exports){
-const fetch = require('node-fetch');
-const querystring = require('querystring');
-
-const Models = require('../models');
-const Stream = require('../stream');
-const Util = require('../util');
-
-const Request = require('./request');
-
-const _util = Symbol.for("generic-util");
-const _wappstoModels = Symbol("wappstoModels");
-const _Stream = Symbol("Stream");
-const _class = "defaultModel";
-const _className = Symbol.for("generic-collection-className");
-const _requestInstance = "_requestInstance";
-
-class Wappsto {
-  constructor(request) {
-    if(request instanceof Request){
-        this[_requestInstance] = request
-    } else {
-        this[_requestInstance] = new Request(request, this);
-    }
-    this[_wappstoModels] = new Models(this[_requestInstance]);
-    this[_Stream] = Stream;
-  }
-
-  get util() {
-    return this[_requestInstance][_util];
-  }
-
-  get models() {
-    return this[_wappstoModels];
-  }
-
-  get Stream() {
-    return this[_Stream];
-  }
-
-  get wStream(){
-    return this[_requestInstance]._wStream;
-  }
-
-  set wStream(wStream){
-    this[_requestInstance]._wStream = wStream;
-  }
-
-  create(type, obj = {}, options){
-      if(!type || !this.models[type]){
-          console.error("you must specify a model type");
-          return;
-      }
-
-      let model = new this.models[type]();
-      model.save(obj, options);
-  }
-
-  get(searchIn, searchObj, options = {}) {
-      // Checking searchIn
-      if(!searchIn){
-        console.error("you must specify a service");
-        return false;
-      }
-
-      // Checking quantity
-      if(options.hasOwnProperty("quantity")){
-        let quantity = options.quantity;
-        if((isNaN(quantity) &&  quantity !== "all") || (!isNaN(quantity) && parseInt(quantity) < 1)){
-          console.error("quantity must be a positive number");
-          return false;
-        }
-      }
-
-      let data = this._getOptionsData(searchObj, options);
-      data = querystring.stringify(data);
-
-      let collection = new this.models.Collection();
-      collection[_className] = searchIn;
-      let M = searchIn.charAt(0).toUpperCase() + searchIn.slice(1);
-      M = this.models[M];
-
-      if (M) {
-        collection[_class] = M;
-      }
-
-      let requestOptions = Object.assign({}, options, {
-        url: this.util.baseUrl + "/" + searchIn + "?" + data
-      });
-      collection.fetch(requestOptions);
-  }
-
-  _getOptionsData(searchObj, options) {
-    let tempObj = {
-      method: options.method || ["retrieve", "update"]
-    };
-    for (let key in searchObj) {
-      let val = searchObj[key];
-      if (val !== undefined && val !== null) {
-        if (key == "_parent" && val instanceof Object) {
-          for (let k in val) {
-            tempObj["parent_" + k] = val[k];
-          }
-        } else {
-          tempObj["this_" + key] = val;
-        }
-      }
-    }
-    if (options.quantity) {
-      tempObj.quantity = options.quantity;
-    }
-    if (options.expand) {
-      tempObj.expand = options.expand;
-    }
-    if (options.message) {
-      tempObj.message = options.message;
-    }
-    return tempObj;
-  }
-
-  initializeStream(streamJSON, options = {}) {
-    let models = [];
-    let searchFor = {};
-    if(!streamJSON){
-      streamJSON = {};
-    } else if(streamJSON.constructor === Array){
-      let paths = [];
-      streamJSON.forEach((obj) => {
-        if(obj instanceof this.models.Model){
-          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
-          paths.push(url);
-          models.push(obj);
-        } else if(obj.constructor === Object){
-          path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
-          if(path){
-            paths.push(path);
-          }
-        }
-      });
-      streamJSON = {
-        subscription: paths
-      };
-    }
-    if(streamJSON.name){
-      searchFor = {
-        name: streamJSON.name
-      }
-    }
-    this.get('stream', searchFor, {
-      expand: 1,
-      success: (streamCollection) => {
-        if (streamCollection.length > 0) {
-          if (!streamJSON.hasOwnProperty('full')) {
-              streamJSON.full = true;
-          }
-          let stream = streamCollection.first();
-
-          // merging with json
-          if(streamJSON.subscription){
-            streamJSON.subscription = [...streamJSON.subscription, ...stream.get("subscription")];
-          }
-          if(streamJSON.ignore){
-            streamJSON.ignore = [...streamJSON.ignore, ...stream.get("ignore")];
-          }
-
-          stream.save(streamJSON, {
-            patch: true,
-            success: () => {
-              this._startStream(stream, models, options);
-            },
-            error: options.error
-          });
-        } else {
-          this._createStream(streamJSON, models, options);
-        }
-      },
-      error: options.error
-    });
-  }
-
-  _createStream(streamJSON, models, options) {
-    let stream = new this.models.Stream(streamJSON);
-    stream.save({}, {
-        success: () => {
-            this._startStream(stream, models, options);
-        },
-        error: options.error
-    });
-  }
-
-  _startStream(stream, models, options){
-    let wStream = new this.Stream(stream);
-    wStream.open();
-    if(options.subscribe === true){
-      wStream.subscribe(models);
-    }
-    if(options.success){
-      options.success(wStream);
-    }
-  }
-}
-
-try {
-  if (typeof window === 'object' && window.document) {
-    window.Wappsto = Wappsto;
-  }
-} catch (e) {
-
-}
-
-module.exports = Wappsto;
-
-},{"../models":5,"../stream":15,"../util":18,"./request":20,"node-fetch":13,"querystring":37}],20:[function(require,module,exports){
-const Request = require('../models/request');
-const StreamModel = require('../models/stream');
-const Collection = require('../models/generic-collection');
-
-const _class = "defaultModel";
-const _className = Symbol.for("generic-collection-className");
-
-const STATUS = {
-  ACCEPTED: "accepted", // user accepted the request
-  PENDING: "pending",   // waiting for restservice
-  WAITING: "waiting"    // waiting for user to accept
-}
-
-let callStatusChange = function(options, status){
-  if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
-    options.onStatusChange.call(this, status);
-  }
-};
-
-class WappstoRequest extends Request {
-  constructor(util, wappsto){
-    super(util);
-    this._wappsto = wappsto;
-    this._waitFor = {};
-  }
-
-  _model(model, options = {}){
-    if(model instanceof StreamModel){
-      super._model.apply(this, arguments);
-      return;
-    }
-    let requestOptions = this._getPrecisePermissionOptions(options);
-    this._wrapRequest(model, requestOptions, options);
-  }
-
-  _collection(collection, options = {}){
-    if(collection[_class].prototype instanceof StreamModel || collection[_className] === "stream"){
-      return super._collection.apply(this, arguments);
-    }
-    let self = this;
-    let requestOptions;
-    if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
-      let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
-      let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
-      requestOptions = Object.assign({}, options, {
-        success: (col, response) => {
-          if(col.length < quantity){
-            callStatusChange.call(col, options, STATUS.WAITING);
-            self._waitFor[searchIn] = [...(self._waitFor[searchIn] || []), { context: col, options: options }];
-          } else {
-            callStatusChange.call(col, options, STATUS.ACCEPTED, col, response);
-            if(options.subscribe === true && self._wStream){
-              self._wStream.subscribe(col);
-            }
-            if(options.success){
-              options.success.call(col, col, response);
-            }
-          }
-        },
-        error: options.error
-      });
-    } else {
-      requestOptions = this._getPrecisePermissionOptions(options);
-    }
-    this._wrapRequest(collection, requestOptions, options);
-  }
-
-  _getPrecisePermissionOptions(options){
-    let self = this;
-    return Object.assign({}, options, {
-        success: (context, jsonResponse, xhrResponse) => {
-          callStatusChange.call(context, options, STATUS.ACCEPTED);
-            if(options.subscribe === true && self._wStream){
-              self._wStream.subscribe(context);
-            }
-            if(options.success){
-                options.success.call(context, context, jsonResponse, xhrResponse);
-            }
-        },
-        error: (context, response) => {
-            if(response.responseJSON && [400013, 400008].indexOf(response.responseJSON.code) !== -1){
-                callStatusChange.call(context, options, STATUS.WAITING);
-                self._waitFor.installation = [...(self._waitFor.installation || []), {context: context, options: options}];
-            } else if(options.error){
-                options.error.call(context, response);
-            }
-        }
-    });
-  }
-
-  _wrapRequest(context, requestOptions, options){
-    if(this._wStreamPromise){
-      this._wStreamPromise.then(() => {
-        this._makeRequest(context, requestOptions, options);
-      }).catch((context, response) => {
-        if(options.error){
-          options.error(context, response);
-        }
-      });
-    } else {
-      this._wStreamPromise = new Promise((resolve, reject) => {
-        this._wappsto.initializeStream({
-          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
-          subscription: ["/notification"],
-          full: true
-        }, {
-          success: (wStream) => {
-            this._wStream = wStream;
-            this._addPermissionListener(wStream);
-            resolve(wStream);
-            this._makeRequest(context, requestOptions, options);
-          },
-          error: (context, response) => {
-            this._wStreamPromise = null;
-            reject(context, response);
-            if(options.error){
-              options.error(context, response);
-            }
-          }
-        });
-      });
-    }
-  }
-
-  _makeRequest(context, requestOptions, options){
-    callStatusChange.call(context, options, STATUS.PENDING);
-    if(context instanceof Collection){
-      super._collection(context, requestOptions);
-    } else {
-      super._model(context, requestOptions);
-    }
-  }
-
-  _addPermissionListener(wStream) {
-    wStream.on("permission:added", (type, ids) => {
-      if(this._waitFor[type]){
-        this._waitFor[type].forEach((obj) => {
-          if(!obj.options){
-            obj.options = {};
-          }
-          obj.options.onlySuccess = true;
-          obj.context._request(obj.options);
-        });
-        delete this._waitFor[type];
-      }
-    });
-  }
-}
-
-module.exports = WappstoRequest;
-
-},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}],21:[function(require,module,exports){
+},{"../util":56,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -2133,9 +1138,10 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],22:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 
-},{}],23:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
+(function (Buffer){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -3914,7 +2920,8 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":21,"ieee754":28}],24:[function(require,module,exports){
+}).call(this,require("buffer").Buffer)
+},{"base64-js":13,"buffer":15,"ieee754":20}],16:[function(require,module,exports){
 module.exports = {
   "100": "Continue",
   "101": "Switching Protocols",
@@ -3980,7 +2987,7 @@ module.exports = {
   "511": "Network Authentication Required"
 }
 
-},{}],25:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -4091,7 +3098,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":30}],26:[function(require,module,exports){
+},{"../../is-buffer/index.js":22}],18:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4616,7 +3623,7 @@ function functionBindPolyfill(context) {
   };
 }
 
-},{}],27:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var http = require('http')
 var url = require('url')
 
@@ -4649,7 +3656,7 @@ function validateParams (params) {
   return params
 }
 
-},{"http":49,"url":55}],28:[function(require,module,exports){
+},{"http":42,"url":48}],20:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = (nBytes * 8) - mLen - 1
@@ -4735,7 +3742,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],29:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -4760,7 +3767,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],30:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -4783,14 +3790,40 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],31:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],32:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
+(function (global){
+"use strict";
+
+// ref: https://github.com/tc39/proposal-global
+var getGlobal = function () {
+	// the only reliable means to get the global object is
+	// `Function('return this')()`
+	// However, this causes CSP violations in Chrome apps.
+	if (typeof self !== 'undefined') { return self; }
+	if (typeof window !== 'undefined') { return window; }
+	if (typeof global !== 'undefined') { return global; }
+	throw new Error('unable to locate global object');
+}
+
+var global = getGlobal();
+
+module.exports = exports = global.fetch;
+
+// Needed for TypeScript and Webpack.
+exports.default = global.fetch.bind(global);
+
+exports.Headers = global.Headers;
+exports.Request = global.Request;
+exports.Response = global.Response;
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],25:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -4838,7 +3871,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 
 }).call(this,require('_process'))
-},{"_process":33}],33:[function(require,module,exports){
+},{"_process":26}],26:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -5024,7 +4057,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],34:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/punycode v1.4.1 by @mathias */
 ;(function(root) {
@@ -5561,7 +4594,7 @@ process.umask = function() { return 0; };
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],35:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5647,7 +4680,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],36:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5734,13 +4767,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],37:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":35,"./encode":36}],38:[function(require,module,exports){
+},{"./decode":28,"./encode":29}],31:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5872,7 +4905,7 @@ Duplex.prototype._destroy = function (err, cb) {
 
   pna.nextTick(cb, err);
 };
-},{"./_stream_readable":40,"./_stream_writable":42,"core-util-is":25,"inherits":29,"process-nextick-args":32}],39:[function(require,module,exports){
+},{"./_stream_readable":33,"./_stream_writable":35,"core-util-is":17,"inherits":21,"process-nextick-args":25}],32:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5920,7 +4953,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":41,"core-util-is":25,"inherits":29}],40:[function(require,module,exports){
+},{"./_stream_transform":34,"core-util-is":17,"inherits":21}],33:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -6942,7 +5975,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":38,"./internal/streams/BufferList":43,"./internal/streams/destroy":44,"./internal/streams/stream":45,"_process":33,"core-util-is":25,"events":26,"inherits":29,"isarray":31,"process-nextick-args":32,"safe-buffer":48,"string_decoder/":46,"util":22}],41:[function(require,module,exports){
+},{"./_stream_duplex":31,"./internal/streams/BufferList":36,"./internal/streams/destroy":37,"./internal/streams/stream":38,"_process":26,"core-util-is":17,"events":18,"inherits":21,"isarray":23,"process-nextick-args":25,"safe-buffer":41,"string_decoder/":39,"util":14}],34:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7157,7 +6190,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":38,"core-util-is":25,"inherits":29}],42:[function(require,module,exports){
+},{"./_stream_duplex":31,"core-util-is":17,"inherits":21}],35:[function(require,module,exports){
 (function (process,global,setImmediate){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -7847,7 +6880,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("timers").setImmediate)
-},{"./_stream_duplex":38,"./internal/streams/destroy":44,"./internal/streams/stream":45,"_process":33,"core-util-is":25,"inherits":29,"process-nextick-args":32,"safe-buffer":48,"timers":53,"util-deprecate":57}],43:[function(require,module,exports){
+},{"./_stream_duplex":31,"./internal/streams/destroy":37,"./internal/streams/stream":38,"_process":26,"core-util-is":17,"inherits":21,"process-nextick-args":25,"safe-buffer":41,"timers":46,"util-deprecate":50}],36:[function(require,module,exports){
 'use strict';
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -7927,7 +6960,7 @@ if (util && util.inspect && util.inspect.custom) {
     return this.constructor.name + ' ' + obj;
   };
 }
-},{"safe-buffer":48,"util":22}],44:[function(require,module,exports){
+},{"safe-buffer":41,"util":14}],37:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -8002,10 +7035,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":32}],45:[function(require,module,exports){
+},{"process-nextick-args":25}],38:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":26}],46:[function(require,module,exports){
+},{"events":18}],39:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -8302,7 +7335,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":48}],47:[function(require,module,exports){
+},{"safe-buffer":41}],40:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -8311,7 +7344,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":38,"./lib/_stream_passthrough.js":39,"./lib/_stream_readable.js":40,"./lib/_stream_transform.js":41,"./lib/_stream_writable.js":42}],48:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":31,"./lib/_stream_passthrough.js":32,"./lib/_stream_readable.js":33,"./lib/_stream_transform.js":34,"./lib/_stream_writable.js":35}],41:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -8375,7 +7408,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":23}],49:[function(require,module,exports){
+},{"buffer":15}],42:[function(require,module,exports){
 (function (global){
 var ClientRequest = require('./lib/request')
 var response = require('./lib/response')
@@ -8463,7 +7496,7 @@ http.METHODS = [
 	'UNSUBSCRIBE'
 ]
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./lib/request":51,"./lib/response":52,"builtin-status-codes":24,"url":55,"xtend":58}],50:[function(require,module,exports){
+},{"./lib/request":44,"./lib/response":45,"builtin-status-codes":16,"url":48,"xtend":52}],43:[function(require,module,exports){
 (function (global){
 exports.fetch = isFunction(global.fetch) && isFunction(global.ReadableStream)
 
@@ -8540,7 +7573,7 @@ function isFunction (value) {
 xhr = null // Help gc
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],51:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 (function (process,global,Buffer){
 var capability = require('./capability')
 var inherits = require('inherits')
@@ -8871,7 +7904,7 @@ var unsafeHeaders = [
 ]
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./capability":50,"./response":52,"_process":33,"buffer":23,"inherits":29,"readable-stream":47,"to-arraybuffer":54}],52:[function(require,module,exports){
+},{"./capability":43,"./response":45,"_process":26,"buffer":15,"inherits":21,"readable-stream":40,"to-arraybuffer":47}],45:[function(require,module,exports){
 (function (process,global,Buffer){
 var capability = require('./capability')
 var inherits = require('inherits')
@@ -9099,7 +8132,7 @@ IncomingMessage.prototype._onXHRProgress = function () {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./capability":50,"_process":33,"buffer":23,"inherits":29,"readable-stream":47}],53:[function(require,module,exports){
+},{"./capability":43,"_process":26,"buffer":15,"inherits":21,"readable-stream":40}],46:[function(require,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = require('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -9178,7 +8211,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
   delete immediateIds[id];
 };
 }).call(this,require("timers").setImmediate,require("timers").clearImmediate)
-},{"process/browser.js":33,"timers":53}],54:[function(require,module,exports){
+},{"process/browser.js":26,"timers":46}],47:[function(require,module,exports){
 var Buffer = require('buffer').Buffer
 
 module.exports = function (buf) {
@@ -9207,7 +8240,7 @@ module.exports = function (buf) {
 	}
 }
 
-},{"buffer":23}],55:[function(require,module,exports){
+},{"buffer":15}],48:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -9941,7 +8974,7 @@ Url.prototype.parseHost = function() {
   if (host) this.hostname = host;
 };
 
-},{"./util":56,"punycode":34,"querystring":37}],56:[function(require,module,exports){
+},{"./util":49,"punycode":27,"querystring":30}],49:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -9959,7 +8992,7 @@ module.exports = {
   }
 };
 
-},{}],57:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 (function (global){
 
 /**
@@ -10030,7 +9063,17 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],58:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
+'use strict';
+
+module.exports = function() {
+  throw new Error(
+    'ws does not work in the browser. Browser clients must use the native ' +
+      'WebSocket object'
+  );
+};
+
+},{}],52:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -10051,4 +9094,965 @@ function extend() {
     return target
 }
 
-},{}]},{},[19]);
+},{}],53:[function(require,module,exports){
+const WebSocket = require('./stream-polyfill');
+const Stream = require('../models/stream');
+const Util = require('../util');
+const Tracer = require('../tracer');
+const EventEmitter = require('events');
+const Model = require('../models/generic-class');
+const Collection = require('../models/generic-collection');
+
+const _stream = Symbol("stream");
+const _source = Symbol("source");
+const _oldSource = Symbol("oldSource");
+const _util = Symbol.for("generic-util");
+const _relations = "_relations";
+
+class WappstoStream extends EventEmitter {
+    constructor(stream) {
+        super();
+        this.models = {};
+        this.close = this.close.bind(this);
+        this._collectionAddCallback = this._collectionAddCallback.bind(this);
+        this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
+        this.on('error', () => {});
+        if (stream instanceof Stream) {
+            this[_stream] = stream;
+            stream.on("destoy", this.close);
+        }
+    }
+
+    get stream() {
+        return this[_stream];
+    }
+
+    open() {
+        if (this.stream && this.stream.get("meta.id") && WebSocket) {
+            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
+            if (!url.startsWith("http") && window && window.location && window.location.origin) {
+                url = window.location.origin + url;
+            }
+            let ws = new WebSocket(url.replace(/^http/, 'ws'));
+            this._addEventListeners(ws);
+            this[_source] = ws;
+        } else {
+            console.error("cannot connect, stream model not found");
+        }
+    }
+
+    close() {
+        if (this[_source]) {
+            this[_source].ignoreReconnect = true;
+            this[_source].close();
+        }
+    }
+
+    _reconnect() {
+        if (this[_source]) {
+            if (this[_oldSource] && !this[_source].ignoreReconnect) {
+                this[_source].ignoreReconnect = true;
+                this[_source].close();
+            } else {
+                this[_oldSource] = this[_source];
+            }
+            this.open();
+        }
+    }
+
+    _addEventListeners(source) {
+        let self = this,
+            url = self.stream.url().replace(/^http/, 'ws');
+
+        let timeout = setTimeout(() => {
+            source.ignoreReconnect = true;
+            source.close();
+            self._reconnect();
+        }, 5000);
+
+        let reconnect = () => {
+            if (!source.ignoreReconnect) {
+                source.ignoreReconnect = true;
+                setTimeout(function() {
+                    self._reconnect();
+                }, 5000);
+            }
+        }
+
+        source.addEventListener('message', function(e) {
+            let message;
+            try {
+                message = JSON.parse(e.data);
+            } catch (e) {
+                self.emit('message', e);
+                return;
+            }
+            self.emit('message', e);
+            message.forEach((msg) => {
+                if(msg.meta_object.type === 'extsync' && msg.extsync.uri === 'extsync/wappsto/editor/console'){
+                    return;
+                }
+                let traceId = self._checkAndSendTrace(msg);
+                self._handleMessage(msg, traceId);
+            });
+        }, false);
+
+        source.addEventListener('open', function(e) {
+            // Connection was opened.
+            console.log('stream open: ' + url);
+            clearTimeout(timeout);
+            self.emit('open', e);
+            // disconnect from old source
+            if (self[_oldSource]) {
+                self[_oldSource].ignoreReconnect = true;
+                self[_oldSource].close();
+                self[_oldSource] = null;
+            }
+        }, false);
+
+        source.addEventListener('error', function(e) {
+            try {
+              self.emit('error', e);
+            } catch (e) {
+              self.emit('error');
+            }
+            console.log('stream error: ' + url);
+        }, false);
+
+        source.addEventListener('close', function(e) {
+            console.log('stream closed: ' + url);
+            clearTimeout(timeout);
+            self.emit('close', e);
+            reconnect();
+        }, false);
+    }
+
+    _checkAndSendTrace(message) {
+        if (message.hasOwnProperty('meta') && message.meta.hasOwnProperty('trace')) {
+            return Tracer.sendTrace(message.meta.trace, null, null, {
+                'stream_id': message.meta.id
+            });
+        }
+    }
+
+    _handleMessage(message, traceId) {
+        let id, models, options, event = message.event;
+        if (traceId) {
+            options = {
+                trace: traceId
+            };
+        }
+        switch (event) {
+            case "create":
+                if (message.meta_object.type === "notification") {
+                    this._handleNotification(message.notification, options);
+                } else {
+                    if(!this._updateModel(message, options)){
+                        id = message.path.split("/");
+                        let last = id[id.length - 1];
+                        id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
+                        models = this.models[id];
+                        if (models) {
+                          let type = message.meta_object.type;
+                          models.forEach((model) => {
+                            let newModel = model.get(type).add(message[type], options);
+                            this.addModel(newModel);
+                          });
+                        }
+                    }
+                }
+                break;
+            case "update":
+                this._updateModel(message, options);
+                break;
+            case "delete":
+                id = message.meta_object.id;
+                models = this.models[id];
+                if (models) {
+                    models.forEach((model) => {
+                      model.emit("destroy", model, options);
+                      this.removeModel(model);
+                    });
+                }
+                break;
+
+        }
+    }
+
+    _updateModel(message, options) {
+        let id = message.meta_object.id;
+        let models = this.models[id];
+        if (models) {
+            models.forEach((model) => {
+              model.emit("stream:message", model, message[message.meta_object.type], message);
+              model.set(message[message.meta_object.type], options);
+            });
+            return true;
+        }
+        return false;
+    }
+
+    _handleNotification(notification, options) {
+        switch (notification.base.code) {
+            case 1100004:
+                this.emit("permission:added", notification.base.type_ids, notification.base.ids, options);
+                break;
+            case 1100013:
+                this.emit("permission:updated", notification.base.type_ids, notification.base.ids, options);
+                break;
+            case 1100006:
+                this.emit("permission:removed", notification.base.type_ids, notification.base.ids, options);
+                break;
+            case 1100007:
+                this.emit("permission:revoked", notification.base.type_ids, notification.base.ids, options);
+                break;
+
+        }
+    }
+
+    subscribe(arr, options = {}) {
+        if (!this.stream) {
+            console.error("stream model is not found, cannot update subscriptions");
+            return;
+        }
+        if(arr.constructor !== Array && !(arr instanceof Collection)){
+            arr = [arr];
+        }
+        let subscriptions = [];
+        let models = [];
+        arr.forEach((obj) => {
+            let { path, isModel } = this._getPath(obj);
+            if(path){
+                subscriptions.push(path);
+                if(isModel){
+                    models.push(obj);
+                }
+            }
+        });
+        if(subscriptions.length === 0) return;
+        let requestOptions = Object.assign({}, options);
+        requestOptions.success = () => {
+            models.forEach((obj) => this.addModel(obj));
+            if (options.success) {
+                options.success.apply(this, arguments);
+            }
+        }
+        return this._updateSubscriptions([...this.stream.get("subscription"), ...subscriptions], requestOptions);
+    }
+
+    unsubscribe(arr, options) {
+        if (!this.stream) {
+            console.error("stream model is not found, cannot update subscriptions");
+            return;
+        }
+        if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
+            arr = [arr];
+        }
+        let update = false;
+        let subscriptions = [...this.stream.get("subscription")];
+        arr.forEach((obj) => {
+            let { path, isModel } = this._getPath(obj);
+            if(path){
+                let index = subscriptions.indexOf(path);
+                if (isModel) {
+                    this.removeModel(obj);
+                }
+                if (index !== -1) {
+                    subscriptions.splice(index, 1);
+                    update = true;
+                }
+            }
+        });
+        if(update){
+            return this._updateSubscriptions(subscriptions, options);
+        } else if(options.success){
+            options.success.call(this.stream, this.stream, this.stream.toJSON(), {});
+        }
+    }
+
+    _getModelUrl(model) {
+        return model.url({
+            full: false
+        }).replace(model.util.baseUrl, "");
+    }
+
+    addModel(model) {
+        this._forAllModels(model, this._addModelToCache.bind(this), this._addCollectionListener.bind(this));
+    }
+
+    removeModel(model) {
+        this._forAllModels(model, this._removeModelFromCache.bind(this), this._removeCollectionListener.bind(this));
+    }
+
+    _forAllModels(model, modelFunc, collectionFunc) {
+        let arr = [model];
+        while (arr.length != 0) {
+            let temp = [];
+            arr.forEach((m) => {
+                modelFunc(m);
+                if (m.constructor[_relations]) {
+                    m.constructor[_relations].forEach(({
+                        key,
+                        type,
+                        relatedClass
+                    }) => {
+                        if (type === Util.type.One) {
+                            temp = [...temp, m.get(key)];
+                        } else if (type === Util.type.Many) {
+                            let col = m.get(key);
+                            collectionFunc(col);
+                            temp = [...temp, ...col.models];
+                        }
+                    });
+                }
+            });
+            arr = temp;
+        }
+    }
+
+    _addModelToCache(model) {
+        let id = model.get("meta.id");
+        if (!this.models.hasOwnProperty(id)) {
+          this.models[id] = [model];
+        } else {
+          if(this.models[id].indexOf(model) === -1){
+            this.models[id].push(model);
+          }
+        }
+    }
+
+    _removeModelFromCache(model) {
+        let id = model.get("meta.id");
+        if(this.models[id]){
+          let index = this.models[id].indexOf(model);
+          if(index !== -1){
+            this.models[id].splice(index, 1);
+            if(this.models[id].length === 0){
+              delete this.models[id];
+            }
+          }
+        }
+    }
+
+    _addCollectionListener(collection){
+        collection.on("add", this._collectionAddCallback);
+        collection.on("remove", this._collectionRemoveCallback);
+    }
+
+    _removeCollectionListener(){
+        collection.off("add", this._collectionAddCallback);
+        collection.off("remove", this._collectionRemoveCallback);
+    }
+
+    _collectionAddCallback(collection, model, options){
+        this.addModel(model);
+    }
+
+    _collectionRemoveCallback(collection, model, options){
+        this.removeModel(model);
+    }
+
+    _updateSubscriptions(subscription, options) {
+        this.stream.set("subscription", subscription);
+        return this.stream.save({
+            subscription,
+            full: true
+        }, {
+            wait: true,
+            patch: true,
+            success: options.success,
+            error: options.error,
+            complete: options.complete
+        });
+    }
+
+    _getPath(obj) {
+        let isObject = obj instanceof Object;
+        let isString = typeof(obj) === "string";
+        if (!isObject && !isString) {
+            console.error("argument must be a string, an object or a class");
+            return {
+                path: undefined,
+                isModel: false,
+                isString: false
+            };
+        }
+        let path;
+        let isModel = obj.constructor.prototype instanceof Model;
+        if (isModel) {
+            path = this._getModelUrl(obj);
+        } else if (isObject) {
+            path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+        } else {
+            path = obj;
+        }
+        return {
+            path,
+            isModel,
+            isString
+        };
+    }
+}
+
+module.exports = WappstoStream;
+
+},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":55,"../util":56,"./stream-polyfill":54,"events":18}],54:[function(require,module,exports){
+let WebSocket;
+if(typeof window === 'object' && window.document && window.WebSocket){
+    WebSocket = window.WebSocket;
+} else {
+    WebSocket = require('ws');
+}
+
+module.exports = WebSocket;
+
+},{"ws":51}],55:[function(require,module,exports){
+const http = require('http');
+const https = require('https');
+
+let tracer = {
+    params: {
+        name: null,
+        parent: null
+    },
+    sendTrace: function(parent, id, name, data, status) {
+        if(!name){
+            if (this.params && this.params.name) {
+                name = this.params.name;
+            } else {
+                name = "WS_APP_BACKGROUND";
+            }
+        }
+        if (id === null) {
+            id = 'WS_APP_BACKGROUND_' + Math.floor(Math.random() * 1000000 + 1);
+        }
+        var str = '';
+        for (let k in data) {
+            let v = data[k];
+            if (typeof v !== 'string') {
+                v = JSON.stringify(v);
+            }
+            str += '&' + k + '=' + encodeURIComponent(v);
+        }
+        if (!status) {
+            status = 'ok';
+        }
+        name = encodeURIComponent(name);
+        var uri = 'id=' + id + '&name=' + name + '&status=' + status + str;
+        if (parent) {
+            uri = 'parent=' + parent + '&' + uri;
+        } else if (this.params && this.params.parent) {
+            uri = 'parent=' + this.params.parent + '&' + uri;
+        }
+        https.get('https://tracer.iot.seluxit.com/trace?' + uri);
+        return id;
+    }
+}
+
+// Overriding http and https
+const originalRequest = {
+    http: {
+        request: http.request,
+        get: http.get
+    },
+    https: {
+        request: https.request,
+        get: https.get
+    }
+};
+const checkAndSendTrace = function(req = {}, options = {}) {
+    let path, method, nodeName;
+    if (req.constructor === String) {
+        path = req.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
+        if(path.indexOf('/') !== -1){
+            path = path.split('/').slice(1).join('/') || '';
+        } else {
+            path = path.split('?')[1] || '';
+        }
+        method = options.method || 'GET';
+    } else if(Object.prototype.toString.call(req) === "[object Object]"){
+        path = req.path;
+        method = req.method || 'GET';
+        options = req;
+    }
+    if(tracer.params && tracer.params.name){
+        nodeName = tracer.params.name + "_" + method + '_' + path;
+    } else {
+        nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
+    }
+    if(!path){
+      return;
+    }
+    if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
+        // Removing trace_parent from path
+        var splitPath = path.split('?');
+        var queryData = {};
+        var tracing = false;
+        if (splitPath.length > 1) {
+            // Converting query to object
+            var query = splitPath[1].split('&');
+            var origin = splitPath[0];
+            query.forEach(function(q) {
+                q = q.split('=');
+                queryData[q[0]] = q[1];
+            });
+
+            var parentNode = queryData['trace_parent'];
+            nodeId = queryData['trace'];
+            if (nodeId) {
+                // Clean and reconstruct
+                delete queryData['trace_parent'];
+                var newQuery = '';
+                for(let key in queryData){
+                    newQuery += key + '=' + queryData[key] + '&';
+                }
+                if (newQuery.length) {
+                    newQuery = '?' + newQuery;
+                    newQuery = newQuery.slice(0, -1);
+                }
+
+                path = origin + newQuery;
+                var splitOrigin = origin.split('/');
+                tracer.sendTrace(parentNode, nodeId, nodeName, { query: queryData }, 'ok');
+                tracing = true;
+            }
+        }
+
+        if (!tracing && tracer.globalTrace === true && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
+            var id = tracer.sendTrace(parentNode, null, nodeName, { method, path }, 'ok');
+            path += '?trace=' + id;
+        }
+
+        options.path = path;
+    }
+};
+const overrideRequest = function(protocol, strName) {
+    protocol.request = function(req, options) {
+        checkAndSendTrace(req, options);
+        return originalRequest[strName].request.apply(this, arguments);
+    }
+    protocol.get = function(req, options) {
+        checkAndSendTrace(req, options);
+        return originalRequest[strName].get.apply(this, arguments);
+    }
+};
+
+overrideRequest(http, 'http');
+overrideRequest(https, 'https');
+
+module.exports = tracer;
+
+},{"http":42,"https":19}],56:[function(require,module,exports){
+(function (process){
+let baseUrl, session;
+if(typeof window === 'object' && window.document){
+    baseUrl = "/services";
+    session = window.sessionStorage.getItem("sessionID");
+} else {
+    baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
+    session = process.env.sessionID;
+}
+
+module.exports = {
+    baseUrl: baseUrl,
+    version: "2.0",
+    type: {
+        One: Symbol.for('one'),
+        Many: Symbol.for('many')
+    },
+    isUUID: function(data) {
+        try {
+            if (data.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-b8-9][a-f0-9]{3}-[a-f0-9]{12}$/i).length > 0) {
+                return true;
+            }
+        } catch (err) {}
+        return false;
+    },
+    extend: function(util) {
+        let newUtil = Object.assign({}, util);
+        if (!newUtil.session) {
+            if(!session){
+                throw new Error("session is required");
+            }
+            newUtil.session = session;
+        }
+        if (!newUtil.version) {
+            newUtil.version = this.version;
+        }
+        if (!newUtil.baseUrl) {
+            newUtil.baseUrl = this.baseUrl;
+        }
+        return newUtil;
+    },
+    throw: function(response){
+      process.on('unhandledRejection', up => { throw up });
+      throw response;
+    }
+}
+
+}).call(this,require('_process'))
+},{"_process":26}],57:[function(require,module,exports){
+const fetch = require('node-fetch');
+const querystring = require('querystring');
+
+const Models = require('../models');
+const Stream = require('../stream');
+const Util = require('../util');
+
+const Request = require('./request');
+
+const _util = Symbol.for("generic-util");
+const _wappstoModels = Symbol("wappstoModels");
+const _Stream = Symbol("Stream");
+const _class = "defaultModel";
+const _className = Symbol.for("generic-collection-className");
+const _requestInstance = "_requestInstance";
+
+class Wappsto {
+  constructor(request) {
+    if(request instanceof Request){
+        this[_requestInstance] = request
+    } else {
+        this[_requestInstance] = new Request(request, this);
+    }
+    this[_wappstoModels] = new Models(this[_requestInstance]);
+    this[_Stream] = Stream;
+  }
+
+  get util() {
+    return this[_requestInstance][_util];
+  }
+
+  get models() {
+    return this[_wappstoModels];
+  }
+
+  get Stream() {
+    return this[_Stream];
+  }
+
+  get wStream(){
+    return this[_requestInstance]._wStream;
+  }
+
+  set wStream(wStream){
+    this[_requestInstance]._wStream = wStream;
+  }
+
+  create(type, obj = {}, options){
+      if(!type || !this.models[type]){
+          console.error("you must specify a model type");
+          return;
+      }
+
+      let model = new this.models[type]();
+      model.save(obj, options);
+  }
+
+  get(searchIn, searchObj, options = {}) {
+      // Checking searchIn
+      if(!searchIn){
+        console.error("you must specify a service");
+        return false;
+      }
+
+      // Checking quantity
+      if(options.hasOwnProperty("quantity")){
+        let quantity = options.quantity;
+        if((isNaN(quantity) &&  quantity !== "all") || (!isNaN(quantity) && parseInt(quantity) < 1)){
+          console.error("quantity must be a positive number");
+          return false;
+        }
+      }
+
+      let data = this._getOptionsData(searchObj, options);
+      data = querystring.stringify(data);
+
+      let collection = new this.models.Collection();
+      collection[_className] = searchIn;
+      let M = searchIn.charAt(0).toUpperCase() + searchIn.slice(1);
+      M = this.models[M];
+
+      if (M) {
+        collection[_class] = M;
+      }
+
+      let requestOptions = Object.assign({}, options, {
+        url: this.util.baseUrl + "/" + searchIn + "?" + data
+      });
+      collection.fetch(requestOptions);
+  }
+
+  _getOptionsData(searchObj, options) {
+    let tempObj = {
+      method: options.method || ["retrieve", "update"]
+    };
+    for (let key in searchObj) {
+      let val = searchObj[key];
+      if (val !== undefined && val !== null) {
+        if (key == "_parent" && val instanceof Object) {
+          for (let k in val) {
+            tempObj["parent_" + k] = val[k];
+          }
+        } else {
+          tempObj["this_" + key] = val;
+        }
+      }
+    }
+    if (options.quantity) {
+      tempObj.quantity = options.quantity;
+    }
+    if (options.expand) {
+      tempObj.expand = options.expand;
+    }
+    if (options.message) {
+      tempObj.message = options.message;
+    }
+    return tempObj;
+  }
+
+  initializeStream(streamJSON, options = {}) {
+    let models = [];
+    let searchFor = {};
+    if(!streamJSON){
+      streamJSON = {};
+    } else if(streamJSON.constructor === Array){
+      let paths = [];
+      streamJSON.forEach((obj) => {
+        if(obj instanceof this.models.Model){
+          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
+          paths.push(url);
+          models.push(obj);
+        } else if(obj.constructor === Object){
+          path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+          if(path){
+            paths.push(path);
+          }
+        }
+      });
+      streamJSON = {
+        subscription: paths
+      };
+    }
+    if(streamJSON.name){
+      searchFor = {
+        name: streamJSON.name
+      }
+    }
+    this.get('stream', searchFor, {
+      expand: 1,
+      success: (streamCollection) => {
+        if (streamCollection.length > 0) {
+          if (!streamJSON.hasOwnProperty('full')) {
+              streamJSON.full = true;
+          }
+          let stream = streamCollection.first();
+
+          // merging with json
+          if(streamJSON.subscription){
+            streamJSON.subscription = [...streamJSON.subscription, ...stream.get("subscription")];
+          }
+          if(streamJSON.ignore){
+            streamJSON.ignore = [...streamJSON.ignore, ...stream.get("ignore")];
+          }
+
+          stream.save(streamJSON, {
+            patch: true,
+            success: () => {
+              this._startStream(stream, models, options);
+            },
+            error: options.error
+          });
+        } else {
+          this._createStream(streamJSON, models, options);
+        }
+      },
+      error: options.error
+    });
+  }
+
+  _createStream(streamJSON, models, options) {
+    let stream = new this.models.Stream(streamJSON);
+    stream.save({}, {
+        success: () => {
+            this._startStream(stream, models, options);
+        },
+        error: options.error
+    });
+  }
+
+  _startStream(stream, models, options){
+    let wStream = new this.Stream(stream);
+    wStream.open();
+    if(options.subscribe === true){
+      wStream.subscribe(models);
+    }
+    if(options.success){
+      options.success(wStream);
+    }
+  }
+}
+
+try {
+  if (typeof window === 'object' && window.document) {
+    window.Wappsto = Wappsto;
+  }
+} catch (e) {
+
+}
+
+module.exports = Wappsto;
+
+},{"../models":5,"../stream":53,"../util":56,"./request":58,"node-fetch":24,"querystring":30}],58:[function(require,module,exports){
+const Request = require('../models/request');
+const StreamModel = require('../models/stream');
+const Collection = require('../models/generic-collection');
+
+const _class = "defaultModel";
+const _className = Symbol.for("generic-collection-className");
+
+const STATUS = {
+  ACCEPTED: "accepted", // user accepted the request
+  PENDING: "pending",   // waiting for restservice
+  WAITING: "waiting"    // waiting for user to accept
+}
+
+let callStatusChange = function(options, status){
+  if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
+    options.onStatusChange.call(this, status);
+  }
+};
+
+class WappstoRequest extends Request {
+  constructor(util, wappsto){
+    super(util);
+    this._wappsto = wappsto;
+    this._waitFor = {};
+  }
+
+  _model(model, options = {}){
+    if(model instanceof StreamModel){
+      super._model.apply(this, arguments);
+      return;
+    }
+    let requestOptions = this._getPrecisePermissionOptions(options);
+    this._wrapRequest(model, requestOptions, options);
+  }
+
+  _collection(collection, options = {}){
+    if(collection[_class].prototype instanceof StreamModel || collection[_className] === "stream"){
+      return super._collection.apply(this, arguments);
+    }
+    let self = this;
+    let requestOptions;
+    if(options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
+      let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
+      let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
+      requestOptions = Object.assign({}, options, {
+        success: (col, response) => {
+          if(col.length < quantity){
+            callStatusChange.call(col, options, STATUS.WAITING);
+            self._waitFor[searchIn] = [...(self._waitFor[searchIn] || []), { context: col, options: options }];
+          } else {
+            callStatusChange.call(col, options, STATUS.ACCEPTED, col, response);
+            if(options.subscribe === true && self._wStream){
+              self._wStream.subscribe(col);
+            }
+            if(options.success){
+              options.success.call(col, col, response);
+            }
+          }
+        },
+        error: options.error
+      });
+    } else {
+      requestOptions = this._getPrecisePermissionOptions(options);
+    }
+    this._wrapRequest(collection, requestOptions, options);
+  }
+
+  _getPrecisePermissionOptions(options){
+    let self = this;
+    return Object.assign({}, options, {
+        success: (context, jsonResponse, xhrResponse) => {
+          callStatusChange.call(context, options, STATUS.ACCEPTED);
+            if(options.subscribe === true && self._wStream){
+              self._wStream.subscribe(context);
+            }
+            if(options.success){
+                options.success.call(context, context, jsonResponse, xhrResponse);
+            }
+        },
+        error: (context, response) => {
+            if(response.responseJSON && [400013, 400008].indexOf(response.responseJSON.code) !== -1){
+                callStatusChange.call(context, options, STATUS.WAITING);
+                self._waitFor.installation = [...(self._waitFor.installation || []), {context: context, options: options}];
+            } else if(options.error){
+                options.error.call(context, response);
+            }
+        }
+    });
+  }
+
+  _wrapRequest(context, requestOptions, options){
+    if(this._wStreamPromise){
+      this._wStreamPromise.then(() => {
+        this._makeRequest(context, requestOptions, options);
+      }).catch((context, response) => {
+        if(options.error){
+          options.error(context, response);
+        }
+      });
+    } else {
+      this._wStreamPromise = new Promise((resolve, reject) => {
+        this._wappsto.initializeStream({
+          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
+          subscription: ["/notification"],
+          full: true
+        }, {
+          success: (wStream) => {
+            this._wStream = wStream;
+            this._addPermissionListener(wStream);
+            resolve(wStream);
+            this._makeRequest(context, requestOptions, options);
+          },
+          error: (context, response) => {
+            this._wStreamPromise = null;
+            reject(context, response);
+            if(options.error){
+              options.error(context, response);
+            }
+          }
+        });
+      });
+    }
+  }
+
+  _makeRequest(context, requestOptions, options){
+    callStatusChange.call(context, options, STATUS.PENDING);
+    if(context instanceof Collection){
+      super._collection(context, requestOptions);
+    } else {
+      super._model(context, requestOptions);
+    }
+  }
+
+  _addPermissionListener(wStream) {
+    wStream.on("permission:added", (type, ids) => {
+      if(this._waitFor[type]){
+        this._waitFor[type].forEach((obj) => {
+          if(!obj.options){
+            obj.options = {};
+          }
+          obj.options.onlySuccess = true;
+          obj.context._request(obj.options);
+        });
+        delete this._waitFor[type];
+      }
+    });
+  }
+}
+
+module.exports = WappstoRequest;
+
+},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}]},{},[57]);
