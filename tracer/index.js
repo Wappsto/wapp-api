@@ -1,6 +1,3 @@
-const http = require('http');
-const https = require('https');
-
 let tracer = {
     params: {
         name: null,
@@ -40,17 +37,6 @@ let tracer = {
     }
 }
 
-// Overriding http and https
-const originalRequest = {
-    http: {
-        request: http.request,
-        get: http.get
-    },
-    https: {
-        request: https.request,
-        get: https.get
-    }
-};
 const checkAndSendTrace = function(req = {}, options = {}) {
     let path, method, nodeName;
     if (req.constructor === String) {
@@ -117,18 +103,40 @@ const checkAndSendTrace = function(req = {}, options = {}) {
         options.path = path;
     }
 };
-const overrideRequest = function(protocol, strName) {
-    protocol.request = function(req, options) {
-        checkAndSendTrace(req, options);
-        return originalRequest[strName].request.apply(this, arguments);
-    }
-    protocol.get = function(req, options) {
-        checkAndSendTrace(req, options);
-        return originalRequest[strName].get.apply(this, arguments);
-    }
-};
 
-overrideRequest(http, 'http');
-overrideRequest(https, 'https');
+if(typeof window === 'object' && window.document && window.fetch){
+  const originalFetch = window.fetch;
+  window.fetch = function(req, options){
+    checkAndSendTrace(req, options);
+    return originalFetch.apply(this, arguments);
+  }
+} else {
+  // Overriding http and https
+  const originalRequest = {
+      http: {
+          request: http.request,
+          get: http.get
+      },
+      https: {
+          request: https.request,
+          get: https.get
+      }
+  };
+  const http = require('http');
+  const https = require('https');
+  const overrideRequest = function(protocol, strName) {
+      protocol.request = function(req, options) {
+          checkAndSendTrace(req, options);
+          return originalRequest[strName].request.apply(this, arguments);
+      }
+      protocol.get = function(req, options) {
+          checkAndSendTrace(req, options);
+          return originalRequest[strName].get.apply(this, arguments);
+      }
+  };
+
+  overrideRequest(http, 'http');
+  overrideRequest(https, 'https');
+}
 
 module.exports = tracer;
