@@ -4,7 +4,6 @@ const querystring = require('querystring');
 const Models = require('../models');
 const Stream = require('../stream');
 const Util = require('../util');
-const Tracer = require('../tracer');
 
 const Request = require('./request');
 
@@ -24,7 +23,6 @@ class Wappsto {
     }
     this[_wappstoModels] = new Models(this[_requestInstance]);
     this[_Stream] = Stream;
-    this.Tracer = Tracer;
   }
 
   get util() {

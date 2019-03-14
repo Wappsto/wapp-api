@@ -1154,7 +1154,7 @@ class WappstoStream extends EventEmitter {
 
     _checkAndSendTrace(message) {
         if (message.hasOwnProperty('meta') && message.meta.hasOwnProperty('trace')) {
-            return Tracer.sendTrace(message.meta.trace, null, null, {
+            return Tracer.sendTrace(this.stream.util.session, message.meta.trace, null, null, {
                 'stream_id': message.meta.id
             });
         }
@@ -1432,15 +1432,17 @@ if(typeof window === 'object' && window.document && window.WebSocket){
 module.exports = WebSocket;
 
 },{"ws":14}],17:[function(require,module,exports){
-const http = require('http');
-const https = require('https');
+let fetch;
+let baseUrl;
+let isBrowser;
 
 let tracer = {
+    globalTrace: false,
     params: {
         name: null,
         parent: null
     },
-    sendTrace: function(parent, id, name, data, status) {
+    sendTrace: function(session, parent, id, name, data, status) {
         if(!name){
             if (this.params && this.params.name) {
                 name = this.params.name;
@@ -1469,22 +1471,65 @@ let tracer = {
         } else if (this.params && this.params.parent) {
             uri = 'parent=' + this.params.parent + '&' + uri;
         }
-        https.get('https://tracer.iot.seluxit.com/trace?' + uri);
+        fetch(through + 'tracer.iot.seluxit.com/trace?' + (isBrowser ? 'x-session=' + session + '&' : '') + uri);
         return id;
     }
 }
 
-// Overriding http and https
-const originalRequest = {
-    http: {
-        request: http.request,
-        get: http.get
-    },
-    https: {
-        request: https.request,
-        get: https.get
+if(typeof window === 'object' && window.document && window.fetch){
+  const originalFetch = window.fetch;
+  window.fetch = function(req, options){
+    checkAndSendTrace(req, options);
+    return originalFetch.apply(this, arguments);
+  }
+  window.Tracer = tracer;
+  fetch = originalFetch;
+  through = "/external/";
+  isBrowser = true;
+  let search = window.location.search;
+  let traceIndex = search.indexOf("trace");
+  if(traceIndex !== -1){
+    let slice = window.location.search.slice(window.location.search.indexOf("trace") + 6)
+    let value = slice.slice(0, slice.indexOf("&"));
+    if(value === "true"){
+      tracer.globalTrace = true;
     }
-};
+  }
+} else {
+  const http = require('http');
+  const https = require('https');
+
+  // Overriding http and https
+  const originalRequest = {
+      http: {
+          request: http.request,
+          get: http.get
+      },
+      https: {
+          request: https.request,
+          get: https.get
+      }
+  };
+
+  const overrideRequest = function(protocol, strName) {
+      protocol.request = function(req, options) {
+          checkAndSendTrace(req, options);
+          return originalRequest[strName].request.apply(this, arguments);
+      }
+      protocol.get = function(req, options) {
+          checkAndSendTrace(req, options);
+          return originalRequest[strName].get.apply(this, arguments);
+      }
+  };
+
+  overrideRequest(http, 'http');
+  overrideRequest(https, 'https');
+
+  fetch = originalRequest["https"].get;
+  through = "https://";
+  isBrowser = false;
+}
+
 const checkAndSendTrace = function(req = {}, options = {}) {
     let path, method, nodeName;
     if (req.constructor === String) {
@@ -1495,18 +1540,20 @@ const checkAndSendTrace = function(req = {}, options = {}) {
             path = path.split('?')[1] || '';
         }
         method = options.method || 'GET';
+        session = options.headers && options.headers["x-session"];
     } else if(Object.prototype.toString.call(req) === "[object Object]"){
         path = req.path;
         method = req.method || 'GET';
         options = req;
+        session = req.headers && req.headers["x-session"];
+    }
+    if(!path || !session){
+      return;
     }
     if(tracer.params && tracer.params.name){
         nodeName = tracer.params.name + "_" + method + '_' + path;
     } else {
         nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
-    }
-    if(!path){
-      return;
     }
     if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
         // Removing trace_parent from path
@@ -1538,32 +1585,19 @@ const checkAndSendTrace = function(req = {}, options = {}) {
 
                 path = origin + newQuery;
                 var splitOrigin = origin.split('/');
-                tracer.sendTrace(parentNode, nodeId, nodeName, { query: queryData }, 'ok');
+                tracer.sendTrace(session, parentNode, nodeId, nodeName, { query: queryData }, 'ok');
                 tracing = true;
             }
         }
 
-        if (!tracing && tracer.globalTrace === true && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
-            var id = tracer.sendTrace(parentNode, null, nodeName, { method, path }, 'ok');
+        if (!tracing && tracer.globalTrace === true && session && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
+            var id = tracer.sendTrace(session, parentNode, null, nodeName, { method, path }, 'ok');
             path += '?trace=' + id;
         }
 
         options.path = path;
     }
 };
-const overrideRequest = function(protocol, strName) {
-    protocol.request = function(req, options) {
-        checkAndSendTrace(req, options);
-        return originalRequest[strName].request.apply(this, arguments);
-    }
-    protocol.get = function(req, options) {
-        checkAndSendTrace(req, options);
-        return originalRequest[strName].get.apply(this, arguments);
-    }
-};
-
-overrideRequest(http, 'http');
-overrideRequest(https, 'https');
 
 module.exports = tracer;
 
@@ -1623,7 +1657,6 @@ const querystring = require('querystring');
 const Models = require('../models');
 const Stream = require('../stream');
 const Util = require('../util');
-const Tracer = require('../tracer');
 
 const Request = require('./request');
 
@@ -1643,7 +1676,6 @@ class Wappsto {
     }
     this[_wappstoModels] = new Models(this[_requestInstance]);
     this[_Stream] = Stream;
-    this.Tracer = Tracer;
   }
 
   get util() {
@@ -1830,7 +1862,7 @@ try {
 
 module.exports = Wappsto;
 
-},{"../models":5,"../stream":15,"../tracer":17,"../util":18,"./request":20,"node-fetch":13,"querystring":37}],20:[function(require,module,exports){
+},{"../models":5,"../stream":15,"../util":18,"./request":20,"node-fetch":13,"querystring":37}],20:[function(require,module,exports){
 const Request = require('../models/request');
 const StreamModel = require('../models/stream');
 const Collection = require('../models/generic-collection');

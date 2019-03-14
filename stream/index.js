@@ -132,7 +132,7 @@ class WappstoStream extends EventEmitter {
 
     _checkAndSendTrace(message) {
         if (message.hasOwnProperty('meta') && message.meta.hasOwnProperty('trace')) {
-            return Tracer.sendTrace(message.meta.trace, null, null, {
+            return Tracer.sendTrace(this.stream.util.session, message.meta.trace, null, null, {
                 'stream_id': message.meta.id
             });
         }
