@@ -25,7 +25,7 @@ class WappstoRequest extends Request {
   }
 
   send(context, options){
-    if(context instanceof StreamModel || context[_class].prototype instanceof StreamModel || context[_className] === "stream"){
+    if(context instanceof StreamModel || (context[_class] && context[_class].prototype instanceof StreamModel) || context[_className] === "stream"){
       return super.send.apply(this, arguments);
     }
     return new Promise((resolve, reject) => {

@@ -1091,7 +1091,7 @@ class WappstoStream extends EventEmitter {
             pingTiemout = setTimeout(() => {
               console.log('connection lost, trying to reconnect to: ' + url);
               self._reconnect();
-            }, 5000);
+            }, 40000);
         }
 
         let reconnect = () => {
@@ -1124,8 +1124,10 @@ class WappstoStream extends EventEmitter {
             console.log('stream open: ' + url);
             self.emit('open', e);
 
-            // Add ping timeout
-            refreshPingTimer();
+            if(typeof window === 'object' && window.document && window.WebSocket){
+                // Add ping timeout
+                refreshPingTimer();
+            }
         }, false);
 
         source.addEventListener('error', function(e) {
