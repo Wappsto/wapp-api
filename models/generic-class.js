@@ -208,7 +208,55 @@ class Generic extends EventEmitter {
     }
 
     _request(options){
-      this[_requestInstance].send(this, options);
+      let savedResponse;
+      let responseFired = false;
+      return this[_requestInstance].send(this, options)
+      .then((response) => {
+        if (!response.ok) {
+          throw response;
+        }
+        savedResponse = response;
+        return response.json();
+      })
+      .then((jsonResponse) => {
+        responseFired = true;
+        if (options.parse !== false) {
+          let data = model.parse(jsonResponse);
+          model.set(data, options);
+        }
+        savedResponse.responseJSON = jsonResponse;
+        this._fireResponse("success", model, [model, jsonResponse, savedResponse], options);
+      })
+      .catch((response) => {
+        if (responseFired) {
+          Util.throw(response);
+        }
+        responseFired = true;
+        if (response.text) {
+          response.text().then((text) => {
+            response.responseText = text;
+            try {
+              response.responseJSON = JSON.parse(text);
+            } catch (error) {
+
+            }
+            this._fireResponse("error", model, [model, response], options);
+          }).catch(() => {
+            this._fireResponse("error", model, [model, response], options);
+          });
+        } else {
+          this._fireResponse("error", model, [model, response], options);
+        }
+      });
+    }
+
+    _fireResponse(type, context, args, options) {
+      if (options[type]) {
+        options[type].apply(context, args);
+      }
+      if (options.complete) {
+        options.complete.call(context, context);
+      }
     }
 
 
