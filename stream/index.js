@@ -8,7 +8,6 @@ const Collection = require('../models/generic-collection');
 
 const _stream = Symbol("stream");
 const _source = Symbol("source");
-const _oldSource = Symbol("oldSource");
 const _util = Symbol.for("generic-util");
 const _relations = "_relations";
 
@@ -48,38 +47,36 @@ class WappstoStream extends EventEmitter {
         if (this[_source]) {
             this[_source].ignoreReconnect = true;
             this[_source].close();
+            this[_source] = null;
         }
     }
 
-    _reconnect() {
-        if (this[_source]) {
-            if (this[_oldSource] && !this[_source].ignoreReconnect) {
-                this[_source].ignoreReconnect = true;
-                this[_source].close();
-            } else {
-                this[_oldSource] = this[_source];
-            }
-            this.open();
-        }
+    _reconnect(keep) {
+        this.close();
+        this.open();
     }
 
     _addEventListeners(source) {
         let self = this,
             url = self.stream.url().replace(/^http/, 'ws');
 
-        let timeout = setTimeout(() => {
-            source.ignoreReconnect = true;
-            source.close();
+        let openTimeout = setTimeout(() => {
             self._reconnect();
         }, 5000);
 
+        let pingTiemout;
+        let refreshPingTimer = function(){
+            clearTimeout(pingTiemout);
+            pingTiemout = setTimeout(() => {
+              console.log('connection lost, trying to reconnect to: ' + url);
+              self._reconnect();
+            }, 40000);
+        }
+
         let reconnect = () => {
-            if (!source.ignoreReconnect) {
-                source.ignoreReconnect = true;
-                setTimeout(function() {
-                    self._reconnect();
-                }, 5000);
-            }
+            setTimeout(function() {
+                self._reconnect();
+            }, 5000);
         }
 
         source.addEventListener('message', function(e) {
@@ -102,14 +99,13 @@ class WappstoStream extends EventEmitter {
 
         source.addEventListener('open', function(e) {
             // Connection was opened.
+            clearTimeout(openTimeout);
             console.log('stream open: ' + url);
-            clearTimeout(timeout);
             self.emit('open', e);
-            // disconnect from old source
-            if (self[_oldSource]) {
-                self[_oldSource].ignoreReconnect = true;
-                self[_oldSource].close();
-                self[_oldSource] = null;
+
+            if(typeof window === 'object' && window.document && window.WebSocket){
+                // Add ping timeout
+                refreshPingTimer();
             }
         }, false);
 
@@ -124,10 +120,17 @@ class WappstoStream extends EventEmitter {
 
         source.addEventListener('close', function(e) {
             console.log('stream closed: ' + url);
-            clearTimeout(timeout);
+            clearTimeout(openTimeout);
+            clearTimeout(pingTiemout);
             self.emit('close', e);
-            reconnect();
+            if(!source.ignoreReconnect){
+                reconnect();
+            }
         }, false);
+
+        source.addEventListener('ping', function(e) {
+            refreshPingTimer();
+        });
     }
 
     _checkAndSendTrace(message) {

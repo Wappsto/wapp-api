@@ -154,26 +154,50 @@ class Wappsto {
           let stream = streamCollection.first();
 
           // merging with json
-          if(streamJSON.subscription){
-            streamJSON.subscription = [...streamJSON.subscription, ...stream.get("subscription")];
-          }
-          if(streamJSON.ignore){
-            streamJSON.ignore = [...streamJSON.ignore, ...stream.get("ignore")];
-          }
+          let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
 
-          stream.save(streamJSON, {
-            patch: true,
-            success: () => {
-              this._startStream(stream, models, options);
-            },
-            error: options.error
-          });
+          if(newJSON){
+            stream.save(newJSON, {
+              patch: true,
+              success: () => {
+                this._startStream(stream, models, options);
+              },
+              error: options.error
+            });
+          } else {
+            this._startStream(stream, models, options);
+          }
         } else {
           this._createStream(streamJSON, models, options);
         }
       },
       error: options.error
     });
+  }
+
+  _mergeStreams(oldJSON, newJSON){
+    let update = false;
+    if(newJSON.subscription){
+      newJSON.subscription.forEach((sub) => {
+        if(oldJSON.subscription.indexOf(sub) === -1){
+          update = true;
+          oldJSON.subscription.push(sub);
+        }
+      });
+    }
+    if(newJSON.ignore){
+      newJSON.ignore.forEach((sub) => {
+        if(oldJSON.ignore.indexOf(sub) === -1){
+          update = true;
+          oldJSON.ignore.push(sub);
+        }
+      });
+    }
+    if(oldJSON.full !== newJSON.full){
+      update = true;
+      oldJSON = newJSON.full;
+    }
+    return update ? oldJSON : undefined;
   }
 
   _createStream(streamJSON, models, options) {

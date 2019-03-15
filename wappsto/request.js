@@ -66,8 +66,7 @@ class WappstoRequest extends Request {
   }
 
   _makeRequest(context, options, resolve, reject){
-    let args = this._getRequestArguments(context, options);
-    fetch(args.url, args.requestOptions).then((response) => {
+    super.send(context, options).then((response) => {
       this._handleResponse(context, options, response, resolve, reject);
     });
   }
