@@ -702,6 +702,7 @@ Notification[_pickAttributes] = {
 module.exports = Notification;
 
 },{"../util":18,"./generic-class":3}],8:[function(require,module,exports){
+const Tracer = require('../tracer');
 const fetch = require('node-fetch');
 const Collection = require('./generic-collection');
 const Util = require('../util');
@@ -844,7 +845,7 @@ class Request {
 
 module.exports = Request;
 
-},{"../util":18,"./generic-collection":4,"node-fetch":13}],9:[function(require,module,exports){
+},{"../tracer":17,"../util":18,"./generic-collection":4,"node-fetch":13}],9:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Collection = require('./generic-collection');
@@ -1651,7 +1652,6 @@ module.exports = {
 
 }).call(this,require('_process'))
 },{"_process":33}],19:[function(require,module,exports){
-const fetch = require('node-fetch');
 const querystring = require('querystring');
 
 const Models = require('../models');
@@ -1862,7 +1862,7 @@ try {
 
 module.exports = Wappsto;
 
-},{"../models":5,"../stream":15,"../util":18,"./request":20,"node-fetch":13,"querystring":37}],20:[function(require,module,exports){
+},{"../models":5,"../stream":15,"../util":18,"./request":20,"querystring":37}],20:[function(require,module,exports){
 const Request = require('../models/request');
 const StreamModel = require('../models/stream');
 const Collection = require('../models/generic-collection');

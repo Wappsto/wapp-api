@@ -1,3 +1,4 @@
+const Tracer = require('../tracer');
 const fetch = require('node-fetch');
 const Collection = require('./generic-collection');
 const Util = require('../util');
