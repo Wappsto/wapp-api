@@ -252,10 +252,10 @@ class Collection extends EventEmitter {
         })
         .then((jsonResponse) => {
           responseFired = true;
-          let data = collection.parse(jsonResponse);
-          collection.add(data);
+          let data = this.parse(jsonResponse);
+          this.add(data);
           savedResponse.responseJSON = jsonResponse;
-          this._fireResponse("success", collection, [collection, jsonResponse, savedResponse], options);
+          this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
         })
         .catch((response) => {
           if (responseFired) {
@@ -270,12 +270,12 @@ class Collection extends EventEmitter {
               } catch (error) {
 
               }
-              this._fireResponse("error", collection, [collection, response], options);
+              this._fireResponse("error", this, [this, response], options);
             }).catch(() => {
-              this._fireResponse("error", collection, [collection, response], options);
+              this._fireResponse("error", this, [this, response], options);
             });
           } else {
-            this._fireResponse("error", collection, [collection, response], options);
+            this._fireResponse("error", this, [this, response], options);
           }
         });
     }

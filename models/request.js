@@ -16,11 +16,11 @@ class Request {
   }
 
   send(context, options){
-    let requestOptions = this._getRequestOptions(context, options);
-    return fetch(url, requestOptions);
+    let args = this._getRequestArguments(context, options);
+    return fetch(args.url, args.requestOptions);
   }
 
-  _getRequestOptions(context, options){
+  _getRequestArguments(context, options){
     let url = (options.url || context.url());
     if (options.query) {
       if (url.indexOf("?") === -1) {
@@ -39,7 +39,7 @@ class Request {
     requestOptions.headers = headers;
     requestOptions.url = url;
     requestOptions.xhr = true;
-    return requestOptions;
+    return {url, requestOptions};
   }
 }
 

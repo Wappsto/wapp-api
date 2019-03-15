@@ -215,17 +215,17 @@ class Generic extends EventEmitter {
         if (!response.ok) {
           throw response;
         }
+        responseFired = true;
         savedResponse = response;
         return response.json();
       })
       .then((jsonResponse) => {
-        responseFired = true;
         if (options.parse !== false) {
-          let data = model.parse(jsonResponse);
-          model.set(data, options);
+          let data = this.parse(jsonResponse);
+          this.set(data, options);
         }
         savedResponse.responseJSON = jsonResponse;
-        this._fireResponse("success", model, [model, jsonResponse, savedResponse], options);
+        this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
       })
       .catch((response) => {
         if (responseFired) {
@@ -240,12 +240,12 @@ class Generic extends EventEmitter {
             } catch (error) {
 
             }
-            this._fireResponse("error", model, [model, response], options);
+            this._fireResponse("error", this, [this, response], options);
           }).catch(() => {
-            this._fireResponse("error", model, [model, response], options);
+            this._fireResponse("error", this, [this, response], options);
           });
         } else {
-          this._fireResponse("error", model, [model, response], options);
+          this._fireResponse("error", this, [this, response], options);
         }
       });
     }

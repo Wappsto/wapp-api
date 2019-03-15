@@ -56,24 +56,25 @@ class WappstoRequest extends Request {
           },
           error: (context, response) => {
             this._wStreamPromise = null;
-            reject(context, response);
-            rejectRequest(response);
+            reject([context, response]);
           }
         });
+      }).catch(([context, response]) => {
+        rejectRequest(response);
       });
     }
   }
 
   _makeRequest(context, options, resolve, reject){
-    let requestOptions = this._getRequestOptions(context, options);
-    fetch(url, requestOptions).then((response) => {
+    let args = this._getRequestArguments(context, options);
+    fetch(args.url, args.requestOptions).then((response) => {
       this._handleResponse(context, options, response, resolve, reject);
     });
   }
 
   _handleResponse(context, options, response, resolve, reject){
     if(response.ok){
-      response.json().then((json) => {
+      response.clone().json().then((json) => {
         this._handleSuccess(context, options, json, response, resolve, reject);
       });
     } else {
@@ -82,7 +83,7 @@ class WappstoRequest extends Request {
   }
 
   _handleSuccess(context, options, json, response, resolve, reject){
-    if(this instanceof Collection && options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
+    if(context instanceof Collection && options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
       let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
       let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
       let length;
@@ -95,9 +96,9 @@ class WappstoRequest extends Request {
         callStatusChange.call(context, options, STATUS.WAITING);
         this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
       } else {
-        callStatusChange.call(col, options, STATUS.ACCEPTED, col, response);
+        callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
         if(options.subscribe === true && this._wStream){
-          this._wStream.subscribe(col);
+          this._wStream.subscribe(context);
         }
         resolve(response);
       }
@@ -112,7 +113,7 @@ class WappstoRequest extends Request {
 
   _handleError(context, options, response, resolve, reject){
     if(response.text){
-      response.json()
+      response.clone().json()
         .then((json) => {
           if(json && [400013, 400008].indexOf(json.code) !== -1){
               callStatusChange.call(context, options, STATUS.WAITING);
