@@ -67,9 +67,19 @@ class Collection extends EventEmitter {
             isArray = false;
         }
         data.forEach((element, index) => {
-            if(this.models.includes(element)){
-                results.push(element);
-                return;
+            if(element.constructor === Object){
+              if(this.models.includes(element)){
+                  results.push(element);
+                  return;
+              }
+            } else if(element.constructor === String){
+              element = {
+                meta: {
+                  id: element
+                }
+              };
+            } else {
+              return;
             }
             let found = this.find(element, options);
             if (found) {
