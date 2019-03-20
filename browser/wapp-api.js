@@ -436,7 +436,7 @@ class Collection extends EventEmitter {
                   id: element
                 }
               };
-            } else {
+            } else if(element.constructor === Array){
               return;
             }
             let found = this.find(element, options);
@@ -1134,7 +1134,7 @@ class WappstoStream extends EventEmitter {
             console.log('stream open: ' + url);
             self.emit('open', e);
 
-            if(typeof window === 'object' && window.document && window.WebSocket){
+            if(!(typeof window === 'object') || !(window.document && window.WebSocket)){
                 // Add ping timeout
                 refreshPingTimer();
             }

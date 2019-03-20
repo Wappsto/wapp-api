@@ -78,7 +78,7 @@ class Collection extends EventEmitter {
                   id: element
                 }
               };
-            } else {
+            } else if(element.constructor === Array){
               return;
             }
             let found = this.find(element, options);
