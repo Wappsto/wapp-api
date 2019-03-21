@@ -225,6 +225,7 @@ class Generic extends EventEmitter {
           this.set(data, options);
         }
         savedResponse.responseJSON = jsonResponse;
+        this.emit("response:handled", this, jsonResponse, savedResponse);
         this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
       })
       .catch((response) => {

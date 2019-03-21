@@ -97,16 +97,20 @@ class WappstoRequest extends Request {
       } else {
         callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
         resolve(response);
-        if(options.subscribe === true && this._wStream){
-          this._wStream.subscribe(context);
-        }
+        context.on("response:handled", () => {
+          if(options.subscribe === true && this._wStream){
+            this._wStream.subscribe(context);
+          }
+        });
       }
     } else {
         callStatusChange.call(context, options, STATUS.ACCEPTED);
         resolve(response);
-        if(options.subscribe === true && this._wStream){
-          this._wStream.subscribe(context);
-        }
+        context.on("response:handled", () => {
+          if(options.subscribe === true && this._wStream){
+            this._wStream.subscribe(context);
+          }
+        });
     }
   }
 

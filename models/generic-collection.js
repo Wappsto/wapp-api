@@ -265,6 +265,7 @@ class Collection extends EventEmitter {
           let data = this.parse(jsonResponse);
           this.add(data);
           savedResponse.responseJSON = jsonResponse;
+          this.emit("response:handled", this, jsonResponse, savedResponse);
           this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
         })
         .catch((response) => {

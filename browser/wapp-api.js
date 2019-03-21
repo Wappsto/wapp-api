@@ -259,6 +259,7 @@ class Generic extends EventEmitter {
           this.set(data, options);
         }
         savedResponse.responseJSON = jsonResponse;
+        this.emit("response:handled", this, jsonResponse, savedResponse);
         this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
       })
       .catch((response) => {
@@ -623,6 +624,7 @@ class Collection extends EventEmitter {
           let data = this.parse(jsonResponse);
           this.add(data);
           savedResponse.responseJSON = jsonResponse;
+          this.emit("response:handled", this, jsonResponse, savedResponse);
           this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
         })
         .catch((response) => {
@@ -1997,16 +1999,20 @@ class WappstoRequest extends Request {
       } else {
         callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
         resolve(response);
-        if(options.subscribe === true && this._wStream){
-          this._wStream.subscribe(context);
-        }
+        context.on("response:handled", () => {
+          if(options.subscribe === true && this._wStream){
+            this._wStream.subscribe(context);
+          }
+        });
       }
     } else {
         callStatusChange.call(context, options, STATUS.ACCEPTED);
         resolve(response);
-        if(options.subscribe === true && this._wStream){
-          this._wStream.subscribe(context);
-        }
+        context.on("response:handled", () => {
+          if(options.subscribe === true && this._wStream){
+            this._wStream.subscribe(context);
+          }
+        });
     }
   }
 
