@@ -2,6 +2,19 @@ let baseUrl, session;
 if(typeof window === 'object' && window.document){
     baseUrl = "/services";
     session = window.sessionStorage.getItem("sessionID");
+    if(!session){
+      let readCookie = function(name){
+        var nameEQ = name + '=';
+        var ca = window.document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+      }
+      session = readCookie("sessionID");
+    }
 } else {
     baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
     session = process.env.sessionID;
