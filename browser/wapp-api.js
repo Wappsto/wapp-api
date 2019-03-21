@@ -1996,17 +1996,17 @@ class WappstoRequest extends Request {
         this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
       } else {
         callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
+        resolve(response);
         if(options.subscribe === true && this._wStream){
           this._wStream.subscribe(context);
         }
-        resolve(response);
       }
     } else {
         callStatusChange.call(context, options, STATUS.ACCEPTED);
+        resolve(response);
         if(options.subscribe === true && this._wStream){
           this._wStream.subscribe(context);
         }
-        resolve(response);
     }
   }
 
