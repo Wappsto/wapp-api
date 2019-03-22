@@ -252,6 +252,7 @@ class Collection extends EventEmitter {
     _request(options){
       let savedResponse;
       let responseFired = false;
+      options.xhr = true;
       return this[_requestInstance].send(this, options)
         .then((response) => {
           if (!response.ok) {
