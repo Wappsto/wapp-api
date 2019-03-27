@@ -29,6 +29,10 @@ class WappstoStream extends EventEmitter {
         return this[_stream];
     }
 
+    get socket() {
+        return this[_source];
+    }
+
     open() {
         if (this.stream && this.stream.get("meta.id") && WebSocket) {
             let url = this.stream.url() + '?x-session=' + this.stream.util.session;
@@ -236,6 +240,8 @@ class WappstoStream extends EventEmitter {
             }
         });
         if(subscriptions.length === 0) return;
+        // DO NOT UPDATE IF IT IS THE SAME SUBSCRIPTIONS
+        // AND MAKE SURE COLLECTION ADD AND REMOVE LISTENERS ARE ADDED ONLY ONCE !!!
         let requestOptions = Object.assign({}, options);
         requestOptions.success = () => {
             models.forEach((obj) => this.addModel(obj));
