@@ -1,4 +1,3 @@
-const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
 let Request;
@@ -250,45 +249,22 @@ class Collection extends EventEmitter {
     }
 
     _request(options){
-      let savedResponse;
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
         .then((response) => {
-          if (!response.ok) {
-            throw response;
-          }
-          savedResponse = response;
-          return response.json();
-        })
-        .then((jsonResponse) => {
           responseFired = true;
-          let data = this.parse(jsonResponse);
+          let data = this.parse(response.data);
           this.add(data);
-          savedResponse.responseJSON = jsonResponse;
-          this.emit("response:handled", this, jsonResponse, savedResponse);
-          this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
+          this.emit("response:handled", this, response.data, response);
+          this._fireResponse("success", this, [this, response.data, response], options);
         })
         .catch((response) => {
           if (responseFired) {
             Util.throw(response);
           }
           responseFired = true;
-          if (response.text) {
-            response.text().then((text) => {
-              response.responseText = text;
-              try {
-                response.responseJSON = JSON.parse(text);
-              } catch (error) {
-
-              }
-              this._fireResponse("error", this, [this, response], options);
-            }).catch(() => {
-              this._fireResponse("error", this, [this, response], options);
-            });
-          } else {
-            this._fireResponse("error", this, [this, response], options);
-          }
+          this._fireResponse("error", this, [this, response], options);
         });
     }
 

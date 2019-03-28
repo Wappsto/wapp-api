@@ -66,30 +66,24 @@ class WappstoRequest extends Request {
   }
 
   _makeRequest(context, options, resolve, reject){
-    super.send(context, options).then((response) => {
-      this._handleResponse(context, options, response, resolve, reject);
+    super.send(context, options)
+    .then((response) => {
+      this._handleSuccess(context, options, response, resolve, reject);
+    })
+    .catch((response) => {
+      this._handleError(context, options, response, resolve, reject);
     });
   }
 
-  _handleResponse(context, options, response, resolve, reject){
-    if(response.ok){
-      response.clone().json().then((json) => {
-        this._handleSuccess(context, options, json, response, resolve, reject);
-      });
-    } else {
-      this._handleError(context, options, response, resolve, reject);
-    }
-  }
-
-  _handleSuccess(context, options, json, response, resolve, reject){
+  _handleSuccess(context, options, response, resolve, reject){
     if(context instanceof Collection && options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
       let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
       let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
       let length;
-      if(json instanceof Array){
-        length = json.length;
+      if(response.data instanceof Array){
+        length = response.data.length;
       } else {
-        length = json.id && json.id.length;
+        length = response.data.id && response.data.id.length;
       }
       if(length < quantity){
         callStatusChange.call(context, options, STATUS.WAITING);
@@ -115,21 +109,11 @@ class WappstoRequest extends Request {
   }
 
   _handleError(context, options, response, resolve, reject){
-    if(response.text){
-      response.clone().json()
-        .then((json) => {
-          if(json && [400013, 400008].indexOf(json.code) !== -1){
-              callStatusChange.call(context, options, STATUS.WAITING);
-              this._waitFor.installation = [...(this._waitFor.installation || []), {context: context, options: options, resolve: resolve, reject: reject}];
-          } else if(options.error){
-              reject(response);
-          }
-        })
-        .catch((error) => {
-          reject(response);
-        });
-    } else {
-      reject(response);
+    if(response.data && response.data.code && [400013, 400008].indexOf(response.data.code) !== -1){
+        callStatusChange.call(context, options, STATUS.WAITING);
+        this._waitFor.installation = [...(this._waitFor.installation || []), {context: context, options: options, resolve: resolve, reject: reject}];
+    } else if(options.error){
+        reject(response);
     }
   }
 

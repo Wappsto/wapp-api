@@ -1,4 +1,3 @@
-const fetch = require('node-fetch');
 const Util = require('../util');
 const EventEmitter = require('events');
 const Collection = require('./generic-collection');
@@ -208,47 +207,24 @@ class Generic extends EventEmitter {
     }
 
     _request(options){
-      let savedResponse;
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
       .then((response) => {
-        if (!response.ok) {
-          throw response;
-        }
         responseFired = true;
-        savedResponse = response;
-        return response.json();
-      })
-      .then((jsonResponse) => {
         if (options.parse !== false) {
-          let data = this.parse(jsonResponse);
+          let data = this.parse(response.data);
           this.set(data, options);
         }
-        savedResponse.responseJSON = jsonResponse;
-        this.emit("response:handled", this, jsonResponse, savedResponse);
-        this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
+        this.emit("response:handled", this, response.data, response);
+        this._fireResponse("success", this, [this, response.data, response], options);
       })
       .catch((response) => {
         if (responseFired) {
           Util.throw(response);
         }
         responseFired = true;
-        if (response.text) {
-          response.text().then((text) => {
-            response.responseText = text;
-            try {
-              response.responseJSON = JSON.parse(text);
-            } catch (error) {
-
-            }
-            this._fireResponse("error", this, [this, response], options);
-          }).catch(() => {
-            this._fireResponse("error", this, [this, response], options);
-          });
-        } else {
-          this._fireResponse("error", this, [this, response], options);
-        }
+        this._fireResponse("error", this, [this, response], options);
       });
     }
 
@@ -270,7 +246,7 @@ class Generic extends EventEmitter {
     save(data, options = {}) {
         if (options.patch == true) {
             options.method = "PATCH";
-            options.body = JSON.stringify(data);
+            options.data = JSON.stringify(data);
         } else {
             if (this.get("meta.id")) {
                 options.method = "PUT";
@@ -279,7 +255,7 @@ class Generic extends EventEmitter {
                 options.create = true;
             }
             let body = Object.assign({}, this.toJSON(options), data);
-            options.body = JSON.stringify(body);
+            options.data = JSON.stringify(body);
         }
         return this._request(options);
     }

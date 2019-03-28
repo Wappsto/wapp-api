@@ -1,5 +1,5 @@
 const Tracer = require('../tracer');
-const fetch = require('node-fetch');
+const axios = require('axios');
 const Collection = require('./generic-collection');
 const Util = require('../util');
 
@@ -17,7 +17,7 @@ class Request {
 
   send(context, options){
     let args = this._getRequestArguments(context, options);
-    return fetch(args.url, args.requestOptions);
+    return axios(args.requestOptions, args.body);
   }
 
   _getRequestArguments(context, options){

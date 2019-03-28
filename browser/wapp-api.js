@@ -31,8 +31,7 @@ Device["_relations"] = [{
 
 module.exports = Device;
 
-},{"../util":56,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
-const fetch = require('node-fetch');
+},{"../util":43,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
 const Util = require('../util');
 const EventEmitter = require('events');
 const Collection = require('./generic-collection');
@@ -242,47 +241,24 @@ class Generic extends EventEmitter {
     }
 
     _request(options){
-      let savedResponse;
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
       .then((response) => {
-        if (!response.ok) {
-          throw response;
-        }
         responseFired = true;
-        savedResponse = response;
-        return response.json();
-      })
-      .then((jsonResponse) => {
         if (options.parse !== false) {
-          let data = this.parse(jsonResponse);
+          let data = this.parse(response.data);
           this.set(data, options);
         }
-        savedResponse.responseJSON = jsonResponse;
-        this.emit("response:handled", this, jsonResponse, savedResponse);
-        this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
+        this.emit("response:handled", this, response.data, response);
+        this._fireResponse("success", this, [this, response.data, response], options);
       })
       .catch((response) => {
         if (responseFired) {
           Util.throw(response);
         }
         responseFired = true;
-        if (response.text) {
-          response.text().then((text) => {
-            response.responseText = text;
-            try {
-              response.responseJSON = JSON.parse(text);
-            } catch (error) {
-
-            }
-            this._fireResponse("error", this, [this, response], options);
-          }).catch(() => {
-            this._fireResponse("error", this, [this, response], options);
-          });
-        } else {
-          this._fireResponse("error", this, [this, response], options);
-        }
+        this._fireResponse("error", this, [this, response], options);
       });
     }
 
@@ -304,7 +280,7 @@ class Generic extends EventEmitter {
     save(data, options = {}) {
         if (options.patch == true) {
             options.method = "PATCH";
-            options.body = JSON.stringify(data);
+            options.data = JSON.stringify(data);
         } else {
             if (this.get("meta.id")) {
                 options.method = "PUT";
@@ -313,7 +289,7 @@ class Generic extends EventEmitter {
                 options.create = true;
             }
             let body = Object.assign({}, this.toJSON(options), data);
-            options.body = JSON.stringify(body);
+            options.data = JSON.stringify(body);
         }
         return this._request(options);
     }
@@ -357,8 +333,7 @@ class Generic extends EventEmitter {
 
 module.exports = Generic;
 
-},{"../util":56,"./generic-collection":4,"./request":8,"events":18,"node-fetch":24}],4:[function(require,module,exports){
-const fetch = require('node-fetch');
+},{"../util":43,"./generic-collection":4,"./request":8,"events":51}],4:[function(require,module,exports){
 const Util = require('../util');
 const EventEmitter = require('events');
 let Request;
@@ -610,45 +585,22 @@ class Collection extends EventEmitter {
     }
 
     _request(options){
-      let savedResponse;
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
         .then((response) => {
-          if (!response.ok) {
-            throw response;
-          }
-          savedResponse = response;
-          return response.json();
-        })
-        .then((jsonResponse) => {
           responseFired = true;
-          let data = this.parse(jsonResponse);
+          let data = this.parse(response.data);
           this.add(data);
-          savedResponse.responseJSON = jsonResponse;
-          this.emit("response:handled", this, jsonResponse, savedResponse);
-          this._fireResponse("success", this, [this, jsonResponse, savedResponse], options);
+          this.emit("response:handled", this, response.data, response);
+          this._fireResponse("success", this, [this, response.data, response], options);
         })
         .catch((response) => {
           if (responseFired) {
             Util.throw(response);
           }
           responseFired = true;
-          if (response.text) {
-            response.text().then((text) => {
-              response.responseText = text;
-              try {
-                response.responseJSON = JSON.parse(text);
-              } catch (error) {
-
-              }
-              this._fireResponse("error", this, [this, response], options);
-            }).catch(() => {
-              this._fireResponse("error", this, [this, response], options);
-            });
-          } else {
-            this._fireResponse("error", this, [this, response], options);
-          }
+          this._fireResponse("error", this, [this, response], options);
         });
     }
 
@@ -724,7 +676,7 @@ class Collection extends EventEmitter {
 
 module.exports = Collection;
 
-},{"../util":56,"./generic-class":3,"./request":8,"events":18,"node-fetch":24}],5:[function(require,module,exports){
+},{"../util":43,"./generic-class":3,"./request":8,"events":51}],5:[function(require,module,exports){
 const Request = require('./request');
 const Util = require('../util');
 
@@ -769,7 +721,7 @@ class WappstoModels {
 
 module.exports = WappstoModels;
 
-},{"../util":56,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
+},{"../util":43,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Device = require('./device');
@@ -795,7 +747,7 @@ Network["_relations"] = [{
 
 module.exports = Network;
 
-},{"../util":56,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
+},{"../util":43,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 
@@ -809,9 +761,9 @@ Notification[_pickAttributes] = {
 
 module.exports = Notification;
 
-},{"../util":56,"./generic-class":3}],8:[function(require,module,exports){
+},{"../util":43,"./generic-class":3}],8:[function(require,module,exports){
 const Tracer = require('../tracer');
-const fetch = require('node-fetch');
+const axios = require('axios');
 const Collection = require('./generic-collection');
 const Util = require('../util');
 
@@ -829,7 +781,7 @@ class Request {
 
   send(context, options){
     let args = this._getRequestArguments(context, options);
-    return fetch(args.url, args.requestOptions);
+    return axios(args.requestOptions, args.body);
   }
 
   _getRequestArguments(context, options){
@@ -857,7 +809,7 @@ class Request {
 
 module.exports = Request;
 
-},{"../tracer":55,"../util":56,"./generic-collection":4,"node-fetch":24}],9:[function(require,module,exports){
+},{"../tracer":42,"../util":43,"./generic-collection":4,"axios":13}],9:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Collection = require('./generic-collection');
@@ -941,7 +893,7 @@ Set[_pickAttributes] = {
 
 module.exports = Set;
 
-},{"../util":56,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
+},{"../util":43,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
 const Generic = require('./generic-class');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
@@ -983,7 +935,7 @@ Stream[_pickAttributes] = {
 
 module.exports = Stream;
 
-},{"../util":56,"./generic-class":3}],12:[function(require,module,exports){
+},{"../util":43,"./generic-class":3}],12:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require("./generic-class");
 const State = require('./state');
@@ -1009,7 +961,2488 @@ Value["_relations"] = [{
 
 module.exports = Value;
 
-},{"../util":56,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
+},{"../util":43,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
+module.exports = require('./lib/axios');
+},{"./lib/axios":15}],14:[function(require,module,exports){
+(function (process){
+'use strict';
+
+var utils = require('./../utils');
+var settle = require('./../core/settle');
+var buildURL = require('./../helpers/buildURL');
+var parseHeaders = require('./../helpers/parseHeaders');
+var isURLSameOrigin = require('./../helpers/isURLSameOrigin');
+var createError = require('../core/createError');
+var btoa = (typeof window !== 'undefined' && window.btoa && window.btoa.bind(window)) || require('./../helpers/btoa');
+
+module.exports = function xhrAdapter(config) {
+  return new Promise(function dispatchXhrRequest(resolve, reject) {
+    var requestData = config.data;
+    var requestHeaders = config.headers;
+
+    if (utils.isFormData(requestData)) {
+      delete requestHeaders['Content-Type']; // Let the browser set it
+    }
+
+    var request = new XMLHttpRequest();
+    var loadEvent = 'onreadystatechange';
+    var xDomain = false;
+
+    // For IE 8/9 CORS support
+    // Only supports POST and GET calls and doesn't returns the response headers.
+    // DON'T do this for testing b/c XMLHttpRequest is mocked, not XDomainRequest.
+    if (process.env.NODE_ENV !== 'test' &&
+        typeof window !== 'undefined' &&
+        window.XDomainRequest && !('withCredentials' in request) &&
+        !isURLSameOrigin(config.url)) {
+      request = new window.XDomainRequest();
+      loadEvent = 'onload';
+      xDomain = true;
+      request.onprogress = function handleProgress() {};
+      request.ontimeout = function handleTimeout() {};
+    }
+
+    // HTTP basic authentication
+    if (config.auth) {
+      var username = config.auth.username || '';
+      var password = config.auth.password || '';
+      requestHeaders.Authorization = 'Basic ' + btoa(username + ':' + password);
+    }
+
+    request.open(config.method.toUpperCase(), buildURL(config.url, config.params, config.paramsSerializer), true);
+
+    // Set the request timeout in MS
+    request.timeout = config.timeout;
+
+    // Listen for ready state
+    request[loadEvent] = function handleLoad() {
+      if (!request || (request.readyState !== 4 && !xDomain)) {
+        return;
+      }
+
+      // The request errored out and we didn't get a response, this will be
+      // handled by onerror instead
+      // With one exception: request that using file: protocol, most browsers
+      // will return status as 0 even though it's a successful request
+      if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+        return;
+      }
+
+      // Prepare the response
+      var responseHeaders = 'getAllResponseHeaders' in request ? parseHeaders(request.getAllResponseHeaders()) : null;
+      var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
+      var response = {
+        data: responseData,
+        // IE sends 1223 instead of 204 (https://github.com/axios/axios/issues/201)
+        status: request.status === 1223 ? 204 : request.status,
+        statusText: request.status === 1223 ? 'No Content' : request.statusText,
+        headers: responseHeaders,
+        config: config,
+        request: request
+      };
+
+      settle(resolve, reject, response);
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle low level network errors
+    request.onerror = function handleError() {
+      // Real errors are hidden from us by the browser
+      // onerror should only fire if it's a network error
+      reject(createError('Network Error', config, null, request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle timeout
+    request.ontimeout = function handleTimeout() {
+      reject(createError('timeout of ' + config.timeout + 'ms exceeded', config, 'ECONNABORTED',
+        request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Add xsrf header
+    // This is only done if running in a standard browser environment.
+    // Specifically not if we're in a web worker, or react-native.
+    if (utils.isStandardBrowserEnv()) {
+      var cookies = require('./../helpers/cookies');
+
+      // Add xsrf header
+      var xsrfValue = (config.withCredentials || isURLSameOrigin(config.url)) && config.xsrfCookieName ?
+          cookies.read(config.xsrfCookieName) :
+          undefined;
+
+      if (xsrfValue) {
+        requestHeaders[config.xsrfHeaderName] = xsrfValue;
+      }
+    }
+
+    // Add headers to the request
+    if ('setRequestHeader' in request) {
+      utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+        if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+          // Remove Content-Type if data is undefined
+          delete requestHeaders[key];
+        } else {
+          // Otherwise add header to the request
+          request.setRequestHeader(key, val);
+        }
+      });
+    }
+
+    // Add withCredentials to request if needed
+    if (config.withCredentials) {
+      request.withCredentials = true;
+    }
+
+    // Add responseType to request if needed
+    if (config.responseType) {
+      try {
+        request.responseType = config.responseType;
+      } catch (e) {
+        // Expected DOMException thrown by browsers not compatible XMLHttpRequest Level 2.
+        // But, this can be suppressed for 'json' type as it can be parsed by default 'transformResponse' function.
+        if (config.responseType !== 'json') {
+          throw e;
+        }
+      }
+    }
+
+    // Handle progress if needed
+    if (typeof config.onDownloadProgress === 'function') {
+      request.addEventListener('progress', config.onDownloadProgress);
+    }
+
+    // Not all browsers support upload events
+    if (typeof config.onUploadProgress === 'function' && request.upload) {
+      request.upload.addEventListener('progress', config.onUploadProgress);
+    }
+
+    if (config.cancelToken) {
+      // Handle cancellation
+      config.cancelToken.promise.then(function onCanceled(cancel) {
+        if (!request) {
+          return;
+        }
+
+        request.abort();
+        reject(cancel);
+        // Clean up request
+        request = null;
+      });
+    }
+
+    if (requestData === undefined) {
+      requestData = null;
+    }
+
+    // Send the request
+    request.send(requestData);
+  });
+};
+
+}).call(this,require('_process'))
+},{"../core/createError":21,"./../core/settle":24,"./../helpers/btoa":28,"./../helpers/buildURL":29,"./../helpers/cookies":31,"./../helpers/isURLSameOrigin":33,"./../helpers/parseHeaders":35,"./../utils":37,"_process":58}],15:[function(require,module,exports){
+'use strict';
+
+var utils = require('./utils');
+var bind = require('./helpers/bind');
+var Axios = require('./core/Axios');
+var defaults = require('./defaults');
+
+/**
+ * Create an instance of Axios
+ *
+ * @param {Object} defaultConfig The default config for the instance
+ * @return {Axios} A new instance of Axios
+ */
+function createInstance(defaultConfig) {
+  var context = new Axios(defaultConfig);
+  var instance = bind(Axios.prototype.request, context);
+
+  // Copy axios.prototype to instance
+  utils.extend(instance, Axios.prototype, context);
+
+  // Copy context to instance
+  utils.extend(instance, context);
+
+  return instance;
+}
+
+// Create the default instance to be exported
+var axios = createInstance(defaults);
+
+// Expose Axios class to allow class inheritance
+axios.Axios = Axios;
+
+// Factory for creating new instances
+axios.create = function create(instanceConfig) {
+  return createInstance(utils.merge(defaults, instanceConfig));
+};
+
+// Expose Cancel & CancelToken
+axios.Cancel = require('./cancel/Cancel');
+axios.CancelToken = require('./cancel/CancelToken');
+axios.isCancel = require('./cancel/isCancel');
+
+// Expose all/spread
+axios.all = function all(promises) {
+  return Promise.all(promises);
+};
+axios.spread = require('./helpers/spread');
+
+module.exports = axios;
+
+// Allow use of default import syntax in TypeScript
+module.exports.default = axios;
+
+},{"./cancel/Cancel":16,"./cancel/CancelToken":17,"./cancel/isCancel":18,"./core/Axios":19,"./defaults":26,"./helpers/bind":27,"./helpers/spread":36,"./utils":37}],16:[function(require,module,exports){
+'use strict';
+
+/**
+ * A `Cancel` is an object that is thrown when an operation is canceled.
+ *
+ * @class
+ * @param {string=} message The message.
+ */
+function Cancel(message) {
+  this.message = message;
+}
+
+Cancel.prototype.toString = function toString() {
+  return 'Cancel' + (this.message ? ': ' + this.message : '');
+};
+
+Cancel.prototype.__CANCEL__ = true;
+
+module.exports = Cancel;
+
+},{}],17:[function(require,module,exports){
+'use strict';
+
+var Cancel = require('./Cancel');
+
+/**
+ * A `CancelToken` is an object that can be used to request cancellation of an operation.
+ *
+ * @class
+ * @param {Function} executor The executor function.
+ */
+function CancelToken(executor) {
+  if (typeof executor !== 'function') {
+    throw new TypeError('executor must be a function.');
+  }
+
+  var resolvePromise;
+  this.promise = new Promise(function promiseExecutor(resolve) {
+    resolvePromise = resolve;
+  });
+
+  var token = this;
+  executor(function cancel(message) {
+    if (token.reason) {
+      // Cancellation has already been requested
+      return;
+    }
+
+    token.reason = new Cancel(message);
+    resolvePromise(token.reason);
+  });
+}
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+CancelToken.prototype.throwIfRequested = function throwIfRequested() {
+  if (this.reason) {
+    throw this.reason;
+  }
+};
+
+/**
+ * Returns an object that contains a new `CancelToken` and a function that, when called,
+ * cancels the `CancelToken`.
+ */
+CancelToken.source = function source() {
+  var cancel;
+  var token = new CancelToken(function executor(c) {
+    cancel = c;
+  });
+  return {
+    token: token,
+    cancel: cancel
+  };
+};
+
+module.exports = CancelToken;
+
+},{"./Cancel":16}],18:[function(require,module,exports){
+'use strict';
+
+module.exports = function isCancel(value) {
+  return !!(value && value.__CANCEL__);
+};
+
+},{}],19:[function(require,module,exports){
+'use strict';
+
+var defaults = require('./../defaults');
+var utils = require('./../utils');
+var InterceptorManager = require('./InterceptorManager');
+var dispatchRequest = require('./dispatchRequest');
+
+/**
+ * Create a new instance of Axios
+ *
+ * @param {Object} instanceConfig The default config for the instance
+ */
+function Axios(instanceConfig) {
+  this.defaults = instanceConfig;
+  this.interceptors = {
+    request: new InterceptorManager(),
+    response: new InterceptorManager()
+  };
+}
+
+/**
+ * Dispatch a request
+ *
+ * @param {Object} config The config specific for this request (merged with this.defaults)
+ */
+Axios.prototype.request = function request(config) {
+  /*eslint no-param-reassign:0*/
+  // Allow for axios('example/url'[, config]) a la fetch API
+  if (typeof config === 'string') {
+    config = utils.merge({
+      url: arguments[0]
+    }, arguments[1]);
+  }
+
+  config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
+  config.method = config.method.toLowerCase();
+
+  // Hook up interceptors middleware
+  var chain = [dispatchRequest, undefined];
+  var promise = Promise.resolve(config);
+
+  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+    chain.push(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  while (chain.length) {
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+// Provide aliases for supported request methods
+utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, config) {
+    return this.request(utils.merge(config || {}, {
+      method: method,
+      url: url
+    }));
+  };
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, data, config) {
+    return this.request(utils.merge(config || {}, {
+      method: method,
+      url: url,
+      data: data
+    }));
+  };
+});
+
+module.exports = Axios;
+
+},{"./../defaults":26,"./../utils":37,"./InterceptorManager":20,"./dispatchRequest":22}],20:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+
+function InterceptorManager() {
+  this.handlers = [];
+}
+
+/**
+ * Add a new interceptor to the stack
+ *
+ * @param {Function} fulfilled The function to handle `then` for a `Promise`
+ * @param {Function} rejected The function to handle `reject` for a `Promise`
+ *
+ * @return {Number} An ID used to remove interceptor later
+ */
+InterceptorManager.prototype.use = function use(fulfilled, rejected) {
+  this.handlers.push({
+    fulfilled: fulfilled,
+    rejected: rejected
+  });
+  return this.handlers.length - 1;
+};
+
+/**
+ * Remove an interceptor from the stack
+ *
+ * @param {Number} id The ID that was returned by `use`
+ */
+InterceptorManager.prototype.eject = function eject(id) {
+  if (this.handlers[id]) {
+    this.handlers[id] = null;
+  }
+};
+
+/**
+ * Iterate over all the registered interceptors
+ *
+ * This method is particularly useful for skipping over any
+ * interceptors that may have become `null` calling `eject`.
+ *
+ * @param {Function} fn The function to call for each interceptor
+ */
+InterceptorManager.prototype.forEach = function forEach(fn) {
+  utils.forEach(this.handlers, function forEachHandler(h) {
+    if (h !== null) {
+      fn(h);
+    }
+  });
+};
+
+module.exports = InterceptorManager;
+
+},{"./../utils":37}],21:[function(require,module,exports){
+'use strict';
+
+var enhanceError = require('./enhanceError');
+
+/**
+ * Create an Error with the specified message, config, error code, request and response.
+ *
+ * @param {string} message The error message.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The created error.
+ */
+module.exports = function createError(message, config, code, request, response) {
+  var error = new Error(message);
+  return enhanceError(error, config, code, request, response);
+};
+
+},{"./enhanceError":23}],22:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+var transformData = require('./transformData');
+var isCancel = require('../cancel/isCancel');
+var defaults = require('../defaults');
+var isAbsoluteURL = require('./../helpers/isAbsoluteURL');
+var combineURLs = require('./../helpers/combineURLs');
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+function throwIfCancellationRequested(config) {
+  if (config.cancelToken) {
+    config.cancelToken.throwIfRequested();
+  }
+}
+
+/**
+ * Dispatch a request to the server using the configured adapter.
+ *
+ * @param {object} config The config that is to be used for the request
+ * @returns {Promise} The Promise to be fulfilled
+ */
+module.exports = function dispatchRequest(config) {
+  throwIfCancellationRequested(config);
+
+  // Support baseURL config
+  if (config.baseURL && !isAbsoluteURL(config.url)) {
+    config.url = combineURLs(config.baseURL, config.url);
+  }
+
+  // Ensure headers exist
+  config.headers = config.headers || {};
+
+  // Transform request data
+  config.data = transformData(
+    config.data,
+    config.headers,
+    config.transformRequest
+  );
+
+  // Flatten headers
+  config.headers = utils.merge(
+    config.headers.common || {},
+    config.headers[config.method] || {},
+    config.headers || {}
+  );
+
+  utils.forEach(
+    ['delete', 'get', 'head', 'post', 'put', 'patch', 'common'],
+    function cleanHeaderConfig(method) {
+      delete config.headers[method];
+    }
+  );
+
+  var adapter = config.adapter || defaults.adapter;
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    throwIfCancellationRequested(config);
+
+    // Transform response data
+    response.data = transformData(
+      response.data,
+      response.headers,
+      config.transformResponse
+    );
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      throwIfCancellationRequested(config);
+
+      // Transform response data
+      if (reason && reason.response) {
+        reason.response.data = transformData(
+          reason.response.data,
+          reason.response.headers,
+          config.transformResponse
+        );
+      }
+    }
+
+    return Promise.reject(reason);
+  });
+};
+
+},{"../cancel/isCancel":18,"../defaults":26,"./../helpers/combineURLs":30,"./../helpers/isAbsoluteURL":32,"./../utils":37,"./transformData":25}],23:[function(require,module,exports){
+'use strict';
+
+/**
+ * Update an Error with the specified config, error code, and response.
+ *
+ * @param {Error} error The error to update.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The error.
+ */
+module.exports = function enhanceError(error, config, code, request, response) {
+  error.config = config;
+  if (code) {
+    error.code = code;
+  }
+  error.request = request;
+  error.response = response;
+  return error;
+};
+
+},{}],24:[function(require,module,exports){
+'use strict';
+
+var createError = require('./createError');
+
+/**
+ * Resolve or reject a Promise based on response status.
+ *
+ * @param {Function} resolve A function that resolves the promise.
+ * @param {Function} reject A function that rejects the promise.
+ * @param {object} response The response.
+ */
+module.exports = function settle(resolve, reject, response) {
+  var validateStatus = response.config.validateStatus;
+  // Note: status is not exposed by XDomainRequest
+  if (!response.status || !validateStatus || validateStatus(response.status)) {
+    resolve(response);
+  } else {
+    reject(createError(
+      'Request failed with status code ' + response.status,
+      response.config,
+      null,
+      response.request,
+      response
+    ));
+  }
+};
+
+},{"./createError":21}],25:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+
+/**
+ * Transform the data for a request or a response
+ *
+ * @param {Object|String} data The data to be transformed
+ * @param {Array} headers The headers for the request or response
+ * @param {Array|Function} fns A single function or Array of functions
+ * @returns {*} The resulting transformed data
+ */
+module.exports = function transformData(data, headers, fns) {
+  /*eslint no-param-reassign:0*/
+  utils.forEach(fns, function transform(fn) {
+    data = fn(data, headers);
+  });
+
+  return data;
+};
+
+},{"./../utils":37}],26:[function(require,module,exports){
+(function (process){
+'use strict';
+
+var utils = require('./utils');
+var normalizeHeaderName = require('./helpers/normalizeHeaderName');
+
+var DEFAULT_CONTENT_TYPE = {
+  'Content-Type': 'application/x-www-form-urlencoded'
+};
+
+function setContentTypeIfUnset(headers, value) {
+  if (!utils.isUndefined(headers) && utils.isUndefined(headers['Content-Type'])) {
+    headers['Content-Type'] = value;
+  }
+}
+
+function getDefaultAdapter() {
+  var adapter;
+  if (typeof XMLHttpRequest !== 'undefined') {
+    // For browsers use XHR adapter
+    adapter = require('./adapters/xhr');
+  } else if (typeof process !== 'undefined') {
+    // For node use HTTP adapter
+    adapter = require('./adapters/http');
+  }
+  return adapter;
+}
+
+var defaults = {
+  adapter: getDefaultAdapter(),
+
+  transformRequest: [function transformRequest(data, headers) {
+    normalizeHeaderName(headers, 'Content-Type');
+    if (utils.isFormData(data) ||
+      utils.isArrayBuffer(data) ||
+      utils.isBuffer(data) ||
+      utils.isStream(data) ||
+      utils.isFile(data) ||
+      utils.isBlob(data)
+    ) {
+      return data;
+    }
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
+      return data.toString();
+    }
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
+
+  transformResponse: [function transformResponse(data) {
+    /*eslint no-param-reassign:0*/
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+  }],
+
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
+  timeout: 0,
+
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+
+  maxContentLength: -1,
+
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  }
+};
+
+defaults.headers = {
+  common: {
+    'Accept': 'application/json, text/plain, */*'
+  }
+};
+
+utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
+  defaults.headers[method] = {};
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
+});
+
+module.exports = defaults;
+
+}).call(this,require('_process'))
+},{"./adapters/http":14,"./adapters/xhr":14,"./helpers/normalizeHeaderName":34,"./utils":37,"_process":58}],27:[function(require,module,exports){
+'use strict';
+
+module.exports = function bind(fn, thisArg) {
+  return function wrap() {
+    var args = new Array(arguments.length);
+    for (var i = 0; i < args.length; i++) {
+      args[i] = arguments[i];
+    }
+    return fn.apply(thisArg, args);
+  };
+};
+
+},{}],28:[function(require,module,exports){
+'use strict';
+
+// btoa polyfill for IE<10 courtesy https://github.com/davidchambers/Base64.js
+
+var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+function E() {
+  this.message = 'String contains an invalid character';
+}
+E.prototype = new Error;
+E.prototype.code = 5;
+E.prototype.name = 'InvalidCharacterError';
+
+function btoa(input) {
+  var str = String(input);
+  var output = '';
+  for (
+    // initialize result and counter
+    var block, charCode, idx = 0, map = chars;
+    // if the next str index does not exist:
+    //   change the mapping table to "="
+    //   check if d has no fractional digits
+    str.charAt(idx | 0) || (map = '=', idx % 1);
+    // "8 - idx % 1 * 8" generates the sequence 2, 4, 6, 8
+    output += map.charAt(63 & block >> 8 - idx % 1 * 8)
+  ) {
+    charCode = str.charCodeAt(idx += 3 / 4);
+    if (charCode > 0xFF) {
+      throw new E();
+    }
+    block = block << 8 | charCode;
+  }
+  return output;
+}
+
+module.exports = btoa;
+
+},{}],29:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+
+function encode(val) {
+  return encodeURIComponent(val).
+    replace(/%40/gi, '@').
+    replace(/%3A/gi, ':').
+    replace(/%24/g, '$').
+    replace(/%2C/gi, ',').
+    replace(/%20/g, '+').
+    replace(/%5B/gi, '[').
+    replace(/%5D/gi, ']');
+}
+
+/**
+ * Build a URL by appending params to the end
+ *
+ * @param {string} url The base of the url (e.g., http://www.google.com)
+ * @param {object} [params] The params to be appended
+ * @returns {string} The formatted url
+ */
+module.exports = function buildURL(url, params, paramsSerializer) {
+  /*eslint no-param-reassign:0*/
+  if (!params) {
+    return url;
+  }
+
+  var serializedParams;
+  if (paramsSerializer) {
+    serializedParams = paramsSerializer(params);
+  } else if (utils.isURLSearchParams(params)) {
+    serializedParams = params.toString();
+  } else {
+    var parts = [];
+
+    utils.forEach(params, function serialize(val, key) {
+      if (val === null || typeof val === 'undefined') {
+        return;
+      }
+
+      if (utils.isArray(val)) {
+        key = key + '[]';
+      } else {
+        val = [val];
+      }
+
+      utils.forEach(val, function parseValue(v) {
+        if (utils.isDate(v)) {
+          v = v.toISOString();
+        } else if (utils.isObject(v)) {
+          v = JSON.stringify(v);
+        }
+        parts.push(encode(key) + '=' + encode(v));
+      });
+    });
+
+    serializedParams = parts.join('&');
+  }
+
+  if (serializedParams) {
+    url += (url.indexOf('?') === -1 ? '?' : '&') + serializedParams;
+  }
+
+  return url;
+};
+
+},{"./../utils":37}],30:[function(require,module,exports){
+'use strict';
+
+/**
+ * Creates a new URL by combining the specified URLs
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} relativeURL The relative URL
+ * @returns {string} The combined URL
+ */
+module.exports = function combineURLs(baseURL, relativeURL) {
+  return relativeURL
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    : baseURL;
+};
+
+},{}],31:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs support document.cookie
+  (function standardBrowserEnv() {
+    return {
+      write: function write(name, value, expires, path, domain, secure) {
+        var cookie = [];
+        cookie.push(name + '=' + encodeURIComponent(value));
+
+        if (utils.isNumber(expires)) {
+          cookie.push('expires=' + new Date(expires).toGMTString());
+        }
+
+        if (utils.isString(path)) {
+          cookie.push('path=' + path);
+        }
+
+        if (utils.isString(domain)) {
+          cookie.push('domain=' + domain);
+        }
+
+        if (secure === true) {
+          cookie.push('secure');
+        }
+
+        document.cookie = cookie.join('; ');
+      },
+
+      read: function read(name) {
+        var match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+        return (match ? decodeURIComponent(match[3]) : null);
+      },
+
+      remove: function remove(name) {
+        this.write(name, '', Date.now() - 86400000);
+      }
+    };
+  })() :
+
+  // Non standard browser env (web workers, react-native) lack needed support.
+  (function nonStandardBrowserEnv() {
+    return {
+      write: function write() {},
+      read: function read() { return null; },
+      remove: function remove() {}
+    };
+  })()
+);
+
+},{"./../utils":37}],32:[function(require,module,exports){
+'use strict';
+
+/**
+ * Determines whether the specified URL is absolute
+ *
+ * @param {string} url The URL to test
+ * @returns {boolean} True if the specified URL is absolute, otherwise false
+ */
+module.exports = function isAbsoluteURL(url) {
+  // A URL is considered absolute if it begins with "<scheme>://" or "//" (protocol-relative URL).
+  // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
+  // by any combination of letters, digits, plus, period, or hyphen.
+  return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+},{}],33:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs have full support of the APIs needed to test
+  // whether the request URL is of the same origin as current location.
+  (function standardBrowserEnv() {
+    var msie = /(msie|trident)/i.test(navigator.userAgent);
+    var urlParsingNode = document.createElement('a');
+    var originURL;
+
+    /**
+    * Parse a URL to discover it's components
+    *
+    * @param {String} url The URL to be parsed
+    * @returns {Object}
+    */
+    function resolveURL(url) {
+      var href = url;
+
+      if (msie) {
+        // IE needs attribute set twice to normalize properties
+        urlParsingNode.setAttribute('href', href);
+        href = urlParsingNode.href;
+      }
+
+      urlParsingNode.setAttribute('href', href);
+
+      // urlParsingNode provides the UrlUtils interface - http://url.spec.whatwg.org/#urlutils
+      return {
+        href: urlParsingNode.href,
+        protocol: urlParsingNode.protocol ? urlParsingNode.protocol.replace(/:$/, '') : '',
+        host: urlParsingNode.host,
+        search: urlParsingNode.search ? urlParsingNode.search.replace(/^\?/, '') : '',
+        hash: urlParsingNode.hash ? urlParsingNode.hash.replace(/^#/, '') : '',
+        hostname: urlParsingNode.hostname,
+        port: urlParsingNode.port,
+        pathname: (urlParsingNode.pathname.charAt(0) === '/') ?
+                  urlParsingNode.pathname :
+                  '/' + urlParsingNode.pathname
+      };
+    }
+
+    originURL = resolveURL(window.location.href);
+
+    /**
+    * Determine if a URL shares the same origin as the current location
+    *
+    * @param {String} requestURL The URL to test
+    * @returns {boolean} True if URL shares the same origin, otherwise false
+    */
+    return function isURLSameOrigin(requestURL) {
+      var parsed = (utils.isString(requestURL)) ? resolveURL(requestURL) : requestURL;
+      return (parsed.protocol === originURL.protocol &&
+            parsed.host === originURL.host);
+    };
+  })() :
+
+  // Non standard browser envs (web workers, react-native) lack needed support.
+  (function nonStandardBrowserEnv() {
+    return function isURLSameOrigin() {
+      return true;
+    };
+  })()
+);
+
+},{"./../utils":37}],34:[function(require,module,exports){
+'use strict';
+
+var utils = require('../utils');
+
+module.exports = function normalizeHeaderName(headers, normalizedName) {
+  utils.forEach(headers, function processHeader(value, name) {
+    if (name !== normalizedName && name.toUpperCase() === normalizedName.toUpperCase()) {
+      headers[normalizedName] = value;
+      delete headers[name];
+    }
+  });
+};
+
+},{"../utils":37}],35:[function(require,module,exports){
+'use strict';
+
+var utils = require('./../utils');
+
+// Headers whose duplicates are ignored by node
+// c.f. https://nodejs.org/api/http.html#http_message_headers
+var ignoreDuplicateOf = [
+  'age', 'authorization', 'content-length', 'content-type', 'etag',
+  'expires', 'from', 'host', 'if-modified-since', 'if-unmodified-since',
+  'last-modified', 'location', 'max-forwards', 'proxy-authorization',
+  'referer', 'retry-after', 'user-agent'
+];
+
+/**
+ * Parse headers into an object
+ *
+ * ```
+ * Date: Wed, 27 Aug 2014 08:58:49 GMT
+ * Content-Type: application/json
+ * Connection: keep-alive
+ * Transfer-Encoding: chunked
+ * ```
+ *
+ * @param {String} headers Headers needing to be parsed
+ * @returns {Object} Headers parsed into an object
+ */
+module.exports = function parseHeaders(headers) {
+  var parsed = {};
+  var key;
+  var val;
+  var i;
+
+  if (!headers) { return parsed; }
+
+  utils.forEach(headers.split('\n'), function parser(line) {
+    i = line.indexOf(':');
+    key = utils.trim(line.substr(0, i)).toLowerCase();
+    val = utils.trim(line.substr(i + 1));
+
+    if (key) {
+      if (parsed[key] && ignoreDuplicateOf.indexOf(key) >= 0) {
+        return;
+      }
+      if (key === 'set-cookie') {
+        parsed[key] = (parsed[key] ? parsed[key] : []).concat([val]);
+      } else {
+        parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+      }
+    }
+  });
+
+  return parsed;
+};
+
+},{"./../utils":37}],36:[function(require,module,exports){
+'use strict';
+
+/**
+ * Syntactic sugar for invoking a function and expanding an array for arguments.
+ *
+ * Common use case would be to use `Function.prototype.apply`.
+ *
+ *  ```js
+ *  function f(x, y, z) {}
+ *  var args = [1, 2, 3];
+ *  f.apply(null, args);
+ *  ```
+ *
+ * With `spread` this example can be re-written.
+ *
+ *  ```js
+ *  spread(function(x, y, z) {})([1, 2, 3]);
+ *  ```
+ *
+ * @param {Function} callback
+ * @returns {Function}
+ */
+module.exports = function spread(callback) {
+  return function wrap(arr) {
+    return callback.apply(null, arr);
+  };
+};
+
+},{}],37:[function(require,module,exports){
+'use strict';
+
+var bind = require('./helpers/bind');
+var isBuffer = require('is-buffer');
+
+/*global toString:true*/
+
+// utils is a library of generic helper functions non-specific to axios
+
+var toString = Object.prototype.toString;
+
+/**
+ * Determine if a value is an Array
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Array, otherwise false
+ */
+function isArray(val) {
+  return toString.call(val) === '[object Array]';
+}
+
+/**
+ * Determine if a value is an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an ArrayBuffer, otherwise false
+ */
+function isArrayBuffer(val) {
+  return toString.call(val) === '[object ArrayBuffer]';
+}
+
+/**
+ * Determine if a value is a FormData
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an FormData, otherwise false
+ */
+function isFormData(val) {
+  return (typeof FormData !== 'undefined') && (val instanceof FormData);
+}
+
+/**
+ * Determine if a value is a view on an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a view on an ArrayBuffer, otherwise false
+ */
+function isArrayBufferView(val) {
+  var result;
+  if ((typeof ArrayBuffer !== 'undefined') && (ArrayBuffer.isView)) {
+    result = ArrayBuffer.isView(val);
+  } else {
+    result = (val) && (val.buffer) && (val.buffer instanceof ArrayBuffer);
+  }
+  return result;
+}
+
+/**
+ * Determine if a value is a String
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a String, otherwise false
+ */
+function isString(val) {
+  return typeof val === 'string';
+}
+
+/**
+ * Determine if a value is a Number
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Number, otherwise false
+ */
+function isNumber(val) {
+  return typeof val === 'number';
+}
+
+/**
+ * Determine if a value is undefined
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if the value is undefined, otherwise false
+ */
+function isUndefined(val) {
+  return typeof val === 'undefined';
+}
+
+/**
+ * Determine if a value is an Object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Object, otherwise false
+ */
+function isObject(val) {
+  return val !== null && typeof val === 'object';
+}
+
+/**
+ * Determine if a value is a Date
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Date, otherwise false
+ */
+function isDate(val) {
+  return toString.call(val) === '[object Date]';
+}
+
+/**
+ * Determine if a value is a File
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a File, otherwise false
+ */
+function isFile(val) {
+  return toString.call(val) === '[object File]';
+}
+
+/**
+ * Determine if a value is a Blob
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Blob, otherwise false
+ */
+function isBlob(val) {
+  return toString.call(val) === '[object Blob]';
+}
+
+/**
+ * Determine if a value is a Function
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Function, otherwise false
+ */
+function isFunction(val) {
+  return toString.call(val) === '[object Function]';
+}
+
+/**
+ * Determine if a value is a Stream
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Stream, otherwise false
+ */
+function isStream(val) {
+  return isObject(val) && isFunction(val.pipe);
+}
+
+/**
+ * Determine if a value is a URLSearchParams object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a URLSearchParams object, otherwise false
+ */
+function isURLSearchParams(val) {
+  return typeof URLSearchParams !== 'undefined' && val instanceof URLSearchParams;
+}
+
+/**
+ * Trim excess whitespace off the beginning and end of a string
+ *
+ * @param {String} str The String to trim
+ * @returns {String} The String freed of excess whitespace
+ */
+function trim(str) {
+  return str.replace(/^\s*/, '').replace(/\s*$/, '');
+}
+
+/**
+ * Determine if we're running in a standard browser environment
+ *
+ * This allows axios to run in a web worker, and react-native.
+ * Both environments support XMLHttpRequest, but not fully standard globals.
+ *
+ * web workers:
+ *  typeof window -> undefined
+ *  typeof document -> undefined
+ *
+ * react-native:
+ *  navigator.product -> 'ReactNative'
+ */
+function isStandardBrowserEnv() {
+  if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
+    return false;
+  }
+  return (
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined'
+  );
+}
+
+/**
+ * Iterate over an Array or an Object invoking a function for each item.
+ *
+ * If `obj` is an Array callback will be called passing
+ * the value, index, and complete array for each item.
+ *
+ * If 'obj' is an Object callback will be called passing
+ * the value, key, and complete object for each property.
+ *
+ * @param {Object|Array} obj The object to iterate
+ * @param {Function} fn The callback to invoke for each item
+ */
+function forEach(obj, fn) {
+  // Don't bother if no value provided
+  if (obj === null || typeof obj === 'undefined') {
+    return;
+  }
+
+  // Force an array if not already something iterable
+  if (typeof obj !== 'object') {
+    /*eslint no-param-reassign:0*/
+    obj = [obj];
+  }
+
+  if (isArray(obj)) {
+    // Iterate over array values
+    for (var i = 0, l = obj.length; i < l; i++) {
+      fn.call(null, obj[i], i, obj);
+    }
+  } else {
+    // Iterate over object keys
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        fn.call(null, obj[key], key, obj);
+      }
+    }
+  }
+}
+
+/**
+ * Accepts varargs expecting each argument to be an object, then
+ * immutably merges the properties of each object and returns result.
+ *
+ * When multiple objects contain the same key the later object in
+ * the arguments list will take precedence.
+ *
+ * Example:
+ *
+ * ```js
+ * var result = merge({foo: 123}, {foo: 456});
+ * console.log(result.foo); // outputs 456
+ * ```
+ *
+ * @param {Object} obj1 Object to merge
+ * @returns {Object} Result of all merge properties
+ */
+function merge(/* obj1, obj2, obj3, ... */) {
+  var result = {};
+  function assignValue(val, key) {
+    if (typeof result[key] === 'object' && typeof val === 'object') {
+      result[key] = merge(result[key], val);
+    } else {
+      result[key] = val;
+    }
+  }
+
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    forEach(arguments[i], assignValue);
+  }
+  return result;
+}
+
+/**
+ * Extends object a by mutably adding to it the properties of object b.
+ *
+ * @param {Object} a The object to be extended
+ * @param {Object} b The object to copy properties from
+ * @param {Object} thisArg The object to bind function to
+ * @return {Object} The resulting value of object a
+ */
+function extend(a, b, thisArg) {
+  forEach(b, function assignValue(val, key) {
+    if (thisArg && typeof val === 'function') {
+      a[key] = bind(val, thisArg);
+    } else {
+      a[key] = val;
+    }
+  });
+  return a;
+}
+
+module.exports = {
+  isArray: isArray,
+  isArrayBuffer: isArrayBuffer,
+  isBuffer: isBuffer,
+  isFormData: isFormData,
+  isArrayBufferView: isArrayBufferView,
+  isString: isString,
+  isNumber: isNumber,
+  isObject: isObject,
+  isUndefined: isUndefined,
+  isDate: isDate,
+  isFile: isFile,
+  isBlob: isBlob,
+  isFunction: isFunction,
+  isStream: isStream,
+  isURLSearchParams: isURLSearchParams,
+  isStandardBrowserEnv: isStandardBrowserEnv,
+  forEach: forEach,
+  merge: merge,
+  extend: extend,
+  trim: trim
+};
+
+},{"./helpers/bind":27,"is-buffer":38}],38:[function(require,module,exports){
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+// The _isBuffer check is for Safari 5-7 support, because it's missing
+// Object.prototype.constructor. Remove this eventually
+module.exports = function (obj) {
+  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
+}
+
+function isBuffer (obj) {
+  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+// For Node v0.10 support. Remove this eventually.
+function isSlowBuffer (obj) {
+  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
+}
+
+},{}],39:[function(require,module,exports){
+'use strict';
+
+module.exports = function() {
+  throw new Error(
+    'ws does not work in the browser. Browser clients must use the native ' +
+      'WebSocket object'
+  );
+};
+
+},{}],40:[function(require,module,exports){
+const WebSocket = require('./stream-polyfill');
+const Stream = require('../models/stream');
+const Util = require('../util');
+const Tracer = require('../tracer');
+const EventEmitter = require('events');
+const Model = require('../models/generic-class');
+const Collection = require('../models/generic-collection');
+
+const _stream = Symbol("stream");
+const _source = Symbol("source");
+const _util = Symbol.for("generic-util");
+const _relations = "_relations";
+
+class WappstoStream extends EventEmitter {
+    constructor(stream) {
+        super();
+        this.models = {};
+        this.close = this.close.bind(this);
+        this._collectionAddCallback = this._collectionAddCallback.bind(this);
+        this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
+        this.on('error', () => {});
+        if (stream instanceof Stream) {
+            this[_stream] = stream;
+            stream.on("destoy", this.close);
+        }
+    }
+
+    get stream() {
+        return this[_stream];
+    }
+
+    get socket() {
+        return this[_source];
+    }
+
+    open() {
+        if (this.stream && this.stream.get("meta.id") && WebSocket) {
+            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
+            if (!url.startsWith("http") && window && window.location && window.location.origin) {
+                url = window.location.origin + url;
+            }
+            let ws = new WebSocket(url.replace(/^http/, 'ws'));
+            this._addEventListeners(ws);
+            this[_source] = ws;
+        } else {
+            console.error("cannot connect, stream model not found");
+        }
+    }
+
+    close() {
+        if (this[_source]) {
+            this[_source].ignoreReconnect = true;
+            this[_source].close();
+            this[_source] = null;
+        }
+    }
+
+    _reconnect(keep) {
+        this.close();
+        this.open();
+    }
+
+    _addEventListeners(source) {
+        let self = this,
+            url = self.stream.url().replace(/^http/, 'ws');
+
+        let openTimeout = setTimeout(() => {
+            self._reconnect();
+        }, 5000);
+
+        let pingTiemout;
+        let refreshPingTimer = function(){
+            clearTimeout(pingTiemout);
+            pingTiemout = setTimeout(() => {
+              console.log('connection lost, trying to reconnect to: ' + url);
+              self._reconnect();
+            }, 40000);
+        }
+
+        let reconnect = () => {
+            setTimeout(function() {
+                self._reconnect();
+            }, 5000);
+        }
+
+        source.addEventListener('message', function(e) {
+            let message;
+            try {
+                message = JSON.parse(e.data);
+            } catch (e) {
+                self.emit('message', e);
+                return;
+            }
+            self.emit('message', e);
+            message.forEach((msg) => {
+                if(msg.meta_object.type === 'extsync' && msg.extsync.uri === 'extsync/wappsto/editor/console'){
+                    return;
+                }
+                let traceId = self._checkAndSendTrace(msg);
+                self._handleMessage(msg, traceId);
+            });
+        }, false);
+
+        source.addEventListener('open', function(e) {
+            // Connection was opened.
+            clearTimeout(openTimeout);
+            console.log('stream open: ' + url);
+            self.emit('open', e);
+
+            if(!(typeof window === 'object') || !(window.document && window.WebSocket)){
+                // Add ping timeout
+                refreshPingTimer();
+            }
+        }, false);
+
+        source.addEventListener('error', function(e) {
+            try {
+              self.emit('error', e);
+            } catch (e) {
+              self.emit('error');
+            }
+            console.log('stream error: ' + url);
+        }, false);
+
+        source.addEventListener('close', function(e) {
+            console.log('stream closed: ' + url);
+            clearTimeout(openTimeout);
+            clearTimeout(pingTiemout);
+            self.emit('close', e);
+            if(!source.ignoreReconnect){
+                reconnect();
+            }
+        }, false);
+
+        source.addEventListener('ping', function(e) {
+            refreshPingTimer();
+        });
+    }
+
+    _checkAndSendTrace(message) {
+        if (message.hasOwnProperty('meta') && message.meta.hasOwnProperty('trace')) {
+            return Tracer.sendTrace(this.stream.util.session, message.meta.trace, null, null, {
+                'stream_id': message.meta.id
+            });
+        }
+    }
+
+    _handleMessage(message, traceId) {
+        let id, models, options, event = message.event;
+        if (traceId) {
+            options = {
+                trace: traceId
+            };
+        }
+        switch (event) {
+            case "create":
+                if (message.meta_object.type === "notification") {
+                    this._handleNotification(message.notification, options);
+                } else {
+                    if(!this._updateModel(message, options)){
+                        id = message.path.split("/");
+                        let last = id[id.length - 1];
+                        id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
+                        models = this.models[id];
+                        if (models) {
+                          let type = message.meta_object.type;
+                          models.forEach((model) => {
+                            let newModel = model.get(type).add(message[type], options);
+                            this.addModel(newModel);
+                          });
+                        }
+                    }
+                }
+                break;
+            case "update":
+                this._updateModel(message, options);
+                break;
+            case "delete":
+                id = message.meta_object.id;
+                models = this.models[id];
+                if (models) {
+                    models.forEach((model) => {
+                      model.emit("destroy", model, options);
+                      this.removeModel(model);
+                    });
+                }
+                break;
+
+        }
+    }
+
+    _updateModel(message, options) {
+        let id = message.meta_object.id;
+        let models = this.models[id];
+        if (models) {
+            models.forEach((model) => {
+              model.emit("stream:message", model, message[message.meta_object.type], message);
+              model.set(message[message.meta_object.type], options);
+            });
+            return true;
+        }
+        return false;
+    }
+
+    _handleNotification(notification, options) {
+        switch (notification.base.code) {
+            case 1100004:
+                this.emit("permission:added", notification.base.type_ids, notification.base.ids, options);
+                break;
+            case 1100013:
+                this.emit("permission:updated", notification.base.type_ids, notification.base.ids, options);
+                break;
+            case 1100006:
+                this.emit("permission:removed", notification.base.type_ids, notification.base.ids, options);
+                break;
+            case 1100007:
+                this.emit("permission:revoked", notification.base.type_ids, notification.base.ids, options);
+                break;
+
+        }
+    }
+
+    subscribe(arr, options = {}) {
+        if (!this.stream) {
+            console.error("stream model is not found, cannot update subscriptions");
+            return;
+        }
+        if(arr.constructor !== Array && !(arr instanceof Collection)){
+            arr = [arr];
+        }
+        let subscriptions = [];
+        let models = [];
+        arr.forEach((obj) => {
+            let { path, isModel } = this._getPath(obj);
+            if(path){
+                subscriptions.push(path);
+                if(isModel){
+                    models.push(obj);
+                }
+            }
+        });
+        if(subscriptions.length === 0) return;
+        // DO NOT UPDATE IF IT IS THE SAME SUBSCRIPTIONS
+        // AND MAKE SURE COLLECTION ADD AND REMOVE LISTENERS ARE ADDED ONLY ONCE !!!
+        let requestOptions = Object.assign({}, options);
+        requestOptions.success = () => {
+            models.forEach((obj) => this.addModel(obj));
+            if (options.success) {
+                options.success.apply(this, arguments);
+            }
+        }
+        return this._updateSubscriptions([...this.stream.get("subscription"), ...subscriptions], requestOptions);
+    }
+
+    unsubscribe(arr, options) {
+        if (!this.stream) {
+            console.error("stream model is not found, cannot update subscriptions");
+            return;
+        }
+        if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
+            arr = [arr];
+        }
+        let update = false;
+        let subscriptions = [...this.stream.get("subscription")];
+        arr.forEach((obj) => {
+            let { path, isModel } = this._getPath(obj);
+            if(path){
+                let index = subscriptions.indexOf(path);
+                if (isModel) {
+                    this.removeModel(obj);
+                }
+                if (index !== -1) {
+                    subscriptions.splice(index, 1);
+                    update = true;
+                }
+            }
+        });
+        if(update){
+            return this._updateSubscriptions(subscriptions, options);
+        } else if(options.success){
+            options.success.call(this.stream, this.stream, this.stream.toJSON(), {});
+        }
+    }
+
+    _getModelUrl(model) {
+        return model.url({
+            full: false
+        }).replace(model.util.baseUrl, "");
+    }
+
+    addModel(model) {
+        this._forAllModels(model, this._addModelToCache.bind(this), this._addCollectionListener.bind(this));
+    }
+
+    removeModel(model) {
+        this._forAllModels(model, this._removeModelFromCache.bind(this), this._removeCollectionListener.bind(this));
+    }
+
+    _forAllModels(model, modelFunc, collectionFunc) {
+        let arr = [model];
+        while (arr.length != 0) {
+            let temp = [];
+            arr.forEach((m) => {
+                modelFunc(m);
+                if (m.constructor[_relations]) {
+                    m.constructor[_relations].forEach(({
+                        key,
+                        type,
+                        relatedClass
+                    }) => {
+                        if (type === Util.type.One) {
+                            temp = [...temp, m.get(key)];
+                        } else if (type === Util.type.Many) {
+                            let col = m.get(key);
+                            collectionFunc(col);
+                            temp = [...temp, ...col.models];
+                        }
+                    });
+                }
+            });
+            arr = temp;
+        }
+    }
+
+    _addModelToCache(model) {
+        let id = model.get("meta.id");
+        if (!this.models.hasOwnProperty(id)) {
+          this.models[id] = [model];
+        } else {
+          if(this.models[id].indexOf(model) === -1){
+            this.models[id].push(model);
+          }
+        }
+    }
+
+    _removeModelFromCache(model) {
+        let id = model.get("meta.id");
+        if(this.models[id]){
+          let index = this.models[id].indexOf(model);
+          if(index !== -1){
+            this.models[id].splice(index, 1);
+            if(this.models[id].length === 0){
+              delete this.models[id];
+            }
+          }
+        }
+    }
+
+    _addCollectionListener(collection){
+        collection.on("add", this._collectionAddCallback);
+        collection.on("remove", this._collectionRemoveCallback);
+    }
+
+    _removeCollectionListener(){
+        collection.off("add", this._collectionAddCallback);
+        collection.off("remove", this._collectionRemoveCallback);
+    }
+
+    _collectionAddCallback(collection, model, options){
+        this.addModel(model);
+    }
+
+    _collectionRemoveCallback(collection, model, options){
+        this.removeModel(model);
+    }
+
+    _updateSubscriptions(subscription, options) {
+        this.stream.set("subscription", subscription);
+        return this.stream.save({
+            subscription,
+            full: true
+        }, {
+            wait: true,
+            patch: true,
+            success: options.success,
+            error: options.error,
+            complete: options.complete
+        });
+    }
+
+    _getPath(obj) {
+        let isObject = obj instanceof Object;
+        let isString = typeof(obj) === "string";
+        if (!isObject && !isString) {
+            console.error("argument must be a string, an object or a class");
+            return {
+                path: undefined,
+                isModel: false,
+                isString: false
+            };
+        }
+        let path;
+        let isModel = obj.constructor.prototype instanceof Model;
+        if (isModel) {
+            path = this._getModelUrl(obj);
+        } else if (isObject) {
+            path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+        } else {
+            path = obj;
+        }
+        return {
+            path,
+            isModel,
+            isString
+        };
+    }
+}
+
+module.exports = WappstoStream;
+
+},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":42,"../util":43,"./stream-polyfill":41,"events":51}],41:[function(require,module,exports){
+let WebSocket;
+if(typeof window === 'object' && window.document && window.WebSocket){
+    WebSocket = window.WebSocket;
+} else {
+    WebSocket = require('ws');
+}
+
+module.exports = WebSocket;
+
+},{"ws":39}],42:[function(require,module,exports){
+let fetch;
+let baseUrl;
+let isBrowser;
+
+let tracer = {
+    globalTrace: false,
+    params: {
+        name: null,
+        parent: null
+    },
+    sendTrace: function(session, parent, id, name, data, status) {
+        if(!name){
+            if (this.params && this.params.name) {
+                name = this.params.name;
+            } else {
+                name = "WS_APP_BACKGROUND";
+            }
+        }
+        if (id === null) {
+            id = 'WS_APP_BACKGROUND_' + Math.floor(Math.random() * 1000000 + 1);
+        }
+        var str = '';
+        for (let k in data) {
+            let v = data[k];
+            if (typeof v !== 'string') {
+                v = JSON.stringify(v);
+            }
+            str += '&' + k + '=' + encodeURIComponent(v);
+        }
+        if (!status) {
+            status = 'ok';
+        }
+        name = encodeURIComponent(name);
+        var uri = 'id=' + id + '&name=' + name + '&status=' + status + str;
+        if (parent) {
+            uri = 'parent=' + parent + '&' + uri;
+        } else if (this.params && this.params.parent) {
+            uri = 'parent=' + this.params.parent + '&' + uri;
+        }
+        fetch(through + 'tracer.iot.seluxit.com/trace?' + (isBrowser ? 'x-session=' + session + '&' : '') + uri);
+        return id;
+    }
+}
+
+if(typeof window === 'object' && window.document && window.fetch){
+  const originalFetch = window.fetch;
+  window.fetch = function(req, options){
+    checkAndSendTrace(req, options);
+    return originalFetch.apply(this, arguments);
+  }
+  window.Tracer = tracer;
+  fetch = originalFetch;
+  through = "/external/";
+  isBrowser = true;
+  let search = window.location.search;
+  let traceIndex = search.indexOf("trace");
+  if(traceIndex !== -1){
+    let slice = window.location.search.slice(window.location.search.indexOf("trace") + 6)
+    let value = slice.slice(0, slice.indexOf("&"));
+    if(value === "true"){
+      tracer.globalTrace = true;
+    }
+  }
+} else {
+  const http = require('http');
+  const https = require('https');
+
+  // Overriding http and https
+  const originalRequest = {
+      http: {
+          request: http.request,
+          get: http.get
+      },
+      https: {
+          request: https.request,
+          get: https.get
+      }
+  };
+
+  const overrideRequest = function(protocol, strName) {
+      protocol.request = function(req, options) {
+          checkAndSendTrace(req, options);
+          return originalRequest[strName].request.apply(this, arguments);
+      }
+      protocol.get = function(req, options) {
+          checkAndSendTrace(req, options);
+          return originalRequest[strName].get.apply(this, arguments);
+      }
+  };
+
+  overrideRequest(http, 'http');
+  overrideRequest(https, 'https');
+
+  fetch = originalRequest["https"].get;
+  through = "https://";
+  isBrowser = false;
+}
+
+const checkAndSendTrace = function(req = {}, options = {}) {
+    let path, method, nodeName;
+    if (req.constructor === String) {
+        path = req.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
+        if(path.indexOf('/') !== -1){
+            path = path.split('/').slice(1).join('/') || '';
+        } else {
+            path = path.split('?')[1] || '';
+        }
+        method = options.method || 'GET';
+        session = options.headers && options.headers["x-session"];
+    } else if(Object.prototype.toString.call(req) === "[object Object]"){
+        path = req.path;
+        method = req.method || 'GET';
+        options = req;
+        session = req.headers && req.headers["x-session"];
+    }
+    if(!path || !session){
+      return;
+    }
+    if(tracer.params && tracer.params.name){
+        nodeName = tracer.params.name + "_" + method + '_' + path;
+    } else {
+        nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
+    }
+    if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
+        // Removing trace_parent from path
+        var splitPath = path.split('?');
+        var queryData = {};
+        var tracing = false;
+        if (splitPath.length > 1) {
+            // Converting query to object
+            var query = splitPath[1].split('&');
+            var origin = splitPath[0];
+            query.forEach(function(q) {
+                q = q.split('=');
+                queryData[q[0]] = q[1];
+            });
+
+            var parentNode = queryData['trace_parent'];
+            nodeId = queryData['trace'];
+            if (nodeId) {
+                // Clean and reconstruct
+                delete queryData['trace_parent'];
+                var newQuery = '';
+                for(let key in queryData){
+                    newQuery += key + '=' + queryData[key] + '&';
+                }
+                if (newQuery.length) {
+                    newQuery = '?' + newQuery;
+                    newQuery = newQuery.slice(0, -1);
+                }
+
+                path = origin + newQuery;
+                var splitOrigin = origin.split('/');
+                tracer.sendTrace(session, parentNode, nodeId, nodeName, { query: queryData }, 'ok');
+                tracing = true;
+            }
+        }
+
+        if (!tracing && tracer.globalTrace === true && session && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
+            var id = tracer.sendTrace(session, parentNode, null, nodeName, { method, path }, 'ok');
+            path += '?trace=' + id;
+        }
+
+        options.path = path;
+    }
+};
+
+module.exports = tracer;
+
+},{"http":74,"https":52}],43:[function(require,module,exports){
+(function (process){
+let baseUrl, session;
+if(typeof window === 'object' && window.document){
+    baseUrl = "/services";
+    session = window.sessionStorage.getItem("sessionID");
+    if(!session){
+      let readCookie = function(name){
+        var nameEQ = name + '=';
+        var ca = window.document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+      }
+      session = readCookie("sessionID");
+    }
+} else {
+    baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
+    session = process.env.sessionID;
+}
+
+module.exports = {
+    baseUrl: baseUrl,
+    version: "2.0",
+    type: {
+        One: Symbol.for('one'),
+        Many: Symbol.for('many')
+    },
+    isUUID: function(data) {
+        try {
+            if (data.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-b8-9][a-f0-9]{3}-[a-f0-9]{12}$/i).length > 0) {
+                return true;
+            }
+        } catch (err) {}
+        return false;
+    },
+    extend: function(util) {
+        let newUtil = Object.assign({}, util);
+        if (!newUtil.session) {
+            if(!session){
+                throw new Error("session is required");
+            }
+            newUtil.session = session;
+        }
+        if (!newUtil.version) {
+            newUtil.version = this.version;
+        }
+        if (!newUtil.baseUrl) {
+            newUtil.baseUrl = this.baseUrl;
+        }
+        return newUtil;
+    },
+    throw: function(response){
+      process.on('unhandledRejection', up => { throw up });
+      throw response;
+    }
+}
+
+}).call(this,require('_process'))
+},{"_process":58}],44:[function(require,module,exports){
+const querystring = require('querystring');
+
+const Models = require('../models');
+const Stream = require('../stream');
+const Util = require('../util');
+
+const Request = require('./request');
+
+const _util = Symbol.for("generic-util");
+const _wappstoModels = Symbol("wappstoModels");
+const _Stream = Symbol("Stream");
+const _class = "defaultModel";
+const _className = Symbol.for("generic-collection-className");
+const _requestInstance = "_requestInstance";
+
+class Wappsto {
+  constructor(request) {
+    if(request instanceof Request){
+        this[_requestInstance] = request
+    } else {
+        this[_requestInstance] = new Request(request, this);
+    }
+    this[_wappstoModels] = new Models(this[_requestInstance]);
+    this[_Stream] = Stream;
+  }
+
+  get util() {
+    return this[_requestInstance][_util];
+  }
+
+  get models() {
+    return this[_wappstoModels];
+  }
+
+  get Stream() {
+    return this[_Stream];
+  }
+
+  get wStream(){
+    return this[_requestInstance]._wStream;
+  }
+
+  set wStream(wStream){
+    this[_requestInstance]._wStream = wStream;
+  }
+
+  create(type, obj = {}, options){
+      if(!type || !this.models[type]){
+          console.error("you must specify a model type");
+          return;
+      }
+
+      let model = new this.models[type]();
+      model.save(obj, options);
+  }
+
+  get(searchIn, searchObj, options = {}) {
+      // Checking searchIn
+      if(!searchIn){
+        console.error("you must specify a service");
+        return false;
+      }
+
+      // Checking quantity
+      if(options.hasOwnProperty("quantity")){
+        let quantity = options.quantity;
+        if((isNaN(quantity) &&  quantity !== "all") || (!isNaN(quantity) && parseInt(quantity) < 1)){
+          console.error("quantity must be a positive number");
+          return false;
+        }
+      }
+
+      let data = this._getOptionsData(searchObj, options);
+      data = querystring.stringify(data);
+
+      let collection = new this.models.Collection();
+      collection[_className] = searchIn;
+      let M = searchIn.charAt(0).toUpperCase() + searchIn.slice(1);
+      M = this.models[M];
+
+      if (M) {
+        collection[_class] = M;
+      }
+
+      let requestOptions = Object.assign({}, options, {
+        url: this.util.baseUrl + "/" + searchIn + "?" + data
+      });
+      collection.fetch(requestOptions);
+  }
+
+  _getOptionsData(searchObj, options) {
+    let tempObj = {
+      method: options.method || ["retrieve", "update"]
+    };
+    for (let key in searchObj) {
+      let val = searchObj[key];
+      if (val !== undefined && val !== null) {
+        if (key == "_parent" && val instanceof Object) {
+          for (let k in val) {
+            tempObj["parent_" + k] = val[k];
+          }
+        } else {
+          tempObj["this_" + key] = val;
+        }
+      }
+    }
+    if (options.quantity) {
+      tempObj.quantity = options.quantity;
+    }
+    if (options.expand) {
+      tempObj.expand = options.expand;
+    }
+    if (options.message) {
+      tempObj.message = options.message;
+    }
+    return tempObj;
+  }
+
+  initializeStream(streamJSON, options = {}) {
+    let models = [];
+    let searchFor = {};
+    if(!streamJSON){
+      streamJSON = {};
+    } else if(streamJSON.constructor === Array){
+      let paths = [];
+      streamJSON.forEach((obj) => {
+        if(obj instanceof this.models.Model){
+          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
+          paths.push(url);
+          models.push(obj);
+        } else if(obj.constructor === Object){
+          path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+          if(path){
+            paths.push(path);
+          }
+        }
+      });
+      streamJSON = {
+        subscription: paths
+      };
+    }
+    if(streamJSON.name){
+      searchFor = {
+        name: streamJSON.name
+      }
+    }
+    this.get('stream', searchFor, {
+      expand: 1,
+      success: (streamCollection) => {
+        if (streamCollection.length > 0) {
+          if (!streamJSON.hasOwnProperty('full')) {
+              streamJSON.full = true;
+          }
+          let stream = streamCollection.first();
+
+          // merging with json
+          let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
+
+          if(newJSON){
+            stream.save(newJSON, {
+              patch: true,
+              success: () => {
+                this._startStream(stream, models, options);
+              },
+              error: options.error
+            });
+          } else {
+            this._startStream(stream, models, options);
+          }
+        } else {
+          this._createStream(streamJSON, models, options);
+        }
+      },
+      error: options.error
+    });
+  }
+
+  _mergeStreams(oldJSON, newJSON){
+    let update = false;
+    if(newJSON.subscription){
+      newJSON.subscription.forEach((sub) => {
+        if(oldJSON.subscription.indexOf(sub) === -1){
+          update = true;
+          oldJSON.subscription.push(sub);
+        }
+      });
+    }
+    if(newJSON.ignore){
+      newJSON.ignore.forEach((sub) => {
+        if(oldJSON.ignore.indexOf(sub) === -1){
+          update = true;
+          oldJSON.ignore.push(sub);
+        }
+      });
+    }
+    if(oldJSON.full !== newJSON.full){
+      update = true;
+      oldJSON = newJSON.full;
+    }
+    return update ? oldJSON : undefined;
+  }
+
+  _createStream(streamJSON, models, options) {
+    let stream = new this.models.Stream(streamJSON);
+    stream.save({}, {
+        success: () => {
+            this._startStream(stream, models, options);
+        },
+        error: options.error
+    });
+  }
+
+  _startStream(stream, models, options){
+    let wStream = new this.Stream(stream);
+    wStream.open();
+    if(options.subscribe === true){
+      wStream.subscribe(models);
+    }
+    if(options.success){
+      options.success(wStream);
+    }
+  }
+}
+
+try {
+  if (typeof window === 'object' && window.document) {
+    window.Wappsto = Wappsto;
+  }
+} catch (e) {
+
+}
+
+module.exports = Wappsto;
+
+},{"../models":5,"../stream":40,"../util":43,"./request":45,"querystring":62}],45:[function(require,module,exports){
+const Request = require('../models/request');
+const StreamModel = require('../models/stream');
+const Collection = require('../models/generic-collection');
+
+const _class = "defaultModel";
+const _className = Symbol.for("generic-collection-className");
+
+const STATUS = {
+  ACCEPTED: "accepted", // user accepted the request
+  PENDING: "pending",   // waiting for restservice
+  WAITING: "waiting"    // waiting for user to accept
+}
+
+let callStatusChange = function(options, status){
+  if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
+    options.onStatusChange.call(this, status);
+  }
+};
+
+class WappstoRequest extends Request {
+  constructor(util, wappsto){
+    super(util);
+    this._wappsto = wappsto;
+    this._waitFor = {};
+  }
+
+  send(context, options){
+    if(context instanceof StreamModel || (context[_class] && context[_class].prototype instanceof StreamModel) || context[_className] === "stream"){
+      return super.send.apply(this, arguments);
+    }
+    return new Promise((resolve, reject) => {
+      callStatusChange.call(context, options, STATUS.PENDING);
+      return this._wrapRequest(context, options, resolve, reject);
+    });
+  }
+
+  _wrapRequest(context, options, resolveRequest, rejectRequest){
+    if(this._wStreamPromise){
+      this._wStreamPromise.then(() => {
+        this._makeRequest(context, options, resolveRequest, rejectRequest);
+      }).catch((context, response) => {
+        rejectRequest(response);
+      });
+    } else {
+      this._wStreamPromise = new Promise((resolve, reject) => {
+        this._wappsto.initializeStream({
+          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
+          subscription: ["/notification"],
+          full: true
+        }, {
+          success: (wStream) => {
+            this._wStream = wStream;
+            this._addPermissionListener(wStream);
+            resolve(wStream);
+            this._makeRequest(context, options, resolveRequest, rejectRequest);
+          },
+          error: (context, response) => {
+            this._wStreamPromise = null;
+            reject([context, response]);
+          }
+        });
+      }).catch(([context, response]) => {
+        rejectRequest(response);
+      });
+    }
+  }
+
+  _makeRequest(context, options, resolve, reject){
+    super.send(context, options)
+    .then((response) => {
+      this._handleSuccess(context, options, response, resolve, reject);
+    })
+    .catch((response) => {
+      this._handleError(context, options, response, resolve, reject);
+    });
+  }
+
+  _handleSuccess(context, options, response, resolve, reject){
+    if(context instanceof Collection && options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
+      let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
+      let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
+      let length;
+      if(response.data instanceof Array){
+        length = response.data.length;
+      } else {
+        length = response.data.id && response.data.id.length;
+      }
+      if(length < quantity){
+        callStatusChange.call(context, options, STATUS.WAITING);
+        this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
+      } else {
+        callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
+        context.on("response:handled", () => {
+          if(options.subscribe === true && this._wStream){
+            this._wStream.subscribe(context);
+          }
+        });
+        resolve(response);
+      }
+    } else {
+        callStatusChange.call(context, options, STATUS.ACCEPTED);
+        context.on("response:handled", () => {
+          if(options.subscribe === true && this._wStream){
+            this._wStream.subscribe(context);
+          }
+        });
+        resolve(response);
+    }
+  }
+
+  _handleError(context, options, response, resolve, reject){
+    if(response.data && response.data.code && [400013, 400008].indexOf(response.data.code) !== -1){
+        callStatusChange.call(context, options, STATUS.WAITING);
+        this._waitFor.installation = [...(this._waitFor.installation || []), {context: context, options: options, resolve: resolve, reject: reject}];
+    } else if(options.error){
+        reject(response);
+    }
+  }
+
+  _addPermissionListener(wStream) {
+    wStream.on("permission:added", (type, ids) => {
+      if(this._waitFor[type]){
+        this._waitFor[type].forEach((obj) => {
+          if(!obj.options){
+            obj.options = {};
+          }
+          obj.options.onlySuccess = true;
+          this._makeRequest(obj.context, obj.options, obj.resolve, obj.reject);
+        });
+        delete this._waitFor[type];
+      }
+    });
+  }
+}
+
+module.exports = WappstoRequest;
+
+},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}],46:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -1162,10 +3595,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],14:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 
-},{}],15:[function(require,module,exports){
-(function (Buffer){
+},{}],48:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -2944,8 +5376,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-}).call(this,require("buffer").Buffer)
-},{"base64-js":13,"buffer":15,"ieee754":20}],16:[function(require,module,exports){
+},{"base64-js":46,"ieee754":53}],49:[function(require,module,exports){
 module.exports = {
   "100": "Continue",
   "101": "Switching Protocols",
@@ -3011,7 +5442,7 @@ module.exports = {
   "511": "Network Authentication Required"
 }
 
-},{}],17:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -3122,7 +5553,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":22}],18:[function(require,module,exports){
+},{"../../is-buffer/index.js":55}],51:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -3647,7 +6078,7 @@ function functionBindPolyfill(context) {
   };
 }
 
-},{}],19:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 var http = require('http')
 var url = require('url')
 
@@ -3680,7 +6111,7 @@ function validateParams (params) {
   return params
 }
 
-},{"http":42,"url":48}],20:[function(require,module,exports){
+},{"http":74,"url":80}],53:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = (nBytes * 8) - mLen - 1
@@ -3766,7 +6197,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],21:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -3791,63 +6222,16 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],22:[function(require,module,exports){
-/*!
- * Determine if an object is a Buffer
- *
- * @author   Feross Aboukhadijeh <https://feross.org>
- * @license  MIT
- */
-
-// The _isBuffer check is for Safari 5-7 support, because it's missing
-// Object.prototype.constructor. Remove this eventually
-module.exports = function (obj) {
-  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
-}
-
-function isBuffer (obj) {
-  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
-}
-
-// For Node v0.10 support. Remove this eventually.
-function isSlowBuffer (obj) {
-  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
-}
-
-},{}],23:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
+arguments[4][38][0].apply(exports,arguments)
+},{"dup":38}],56:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],24:[function(require,module,exports){
-(function (global){
-"use strict";
-
-// ref: https://github.com/tc39/proposal-global
-var getGlobal = function () {
-	// the only reliable means to get the global object is
-	// `Function('return this')()`
-	// However, this causes CSP violations in Chrome apps.
-	if (typeof self !== 'undefined') { return self; }
-	if (typeof window !== 'undefined') { return window; }
-	if (typeof global !== 'undefined') { return global; }
-	throw new Error('unable to locate global object');
-}
-
-var global = getGlobal();
-
-module.exports = exports = global.fetch;
-
-// Needed for TypeScript and Webpack.
-exports.default = global.fetch.bind(global);
-
-exports.Headers = global.Headers;
-exports.Request = global.Request;
-exports.Response = global.Response;
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],25:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -3895,7 +6279,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 
 }).call(this,require('_process'))
-},{"_process":26}],26:[function(require,module,exports){
+},{"_process":58}],58:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -4081,7 +6465,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],27:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/punycode v1.4.1 by @mathias */
 ;(function(root) {
@@ -4618,7 +7002,7 @@ process.umask = function() { return 0; };
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],28:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4704,7 +7088,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],29:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4791,13 +7175,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],30:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":28,"./encode":29}],31:[function(require,module,exports){
+},{"./decode":60,"./encode":61}],63:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4929,7 +7313,7 @@ Duplex.prototype._destroy = function (err, cb) {
 
   pna.nextTick(cb, err);
 };
-},{"./_stream_readable":33,"./_stream_writable":35,"core-util-is":17,"inherits":21,"process-nextick-args":25}],32:[function(require,module,exports){
+},{"./_stream_readable":65,"./_stream_writable":67,"core-util-is":50,"inherits":54,"process-nextick-args":57}],64:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4977,7 +7361,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":34,"core-util-is":17,"inherits":21}],33:[function(require,module,exports){
+},{"./_stream_transform":66,"core-util-is":50,"inherits":54}],65:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -5999,7 +8383,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":31,"./internal/streams/BufferList":36,"./internal/streams/destroy":37,"./internal/streams/stream":38,"_process":26,"core-util-is":17,"events":18,"inherits":21,"isarray":23,"process-nextick-args":25,"safe-buffer":41,"string_decoder/":39,"util":14}],34:[function(require,module,exports){
+},{"./_stream_duplex":63,"./internal/streams/BufferList":68,"./internal/streams/destroy":69,"./internal/streams/stream":70,"_process":58,"core-util-is":50,"events":51,"inherits":54,"isarray":56,"process-nextick-args":57,"safe-buffer":73,"string_decoder/":71,"util":47}],66:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -6214,7 +8598,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":31,"core-util-is":17,"inherits":21}],35:[function(require,module,exports){
+},{"./_stream_duplex":63,"core-util-is":50,"inherits":54}],67:[function(require,module,exports){
 (function (process,global,setImmediate){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -6904,7 +9288,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("timers").setImmediate)
-},{"./_stream_duplex":31,"./internal/streams/destroy":37,"./internal/streams/stream":38,"_process":26,"core-util-is":17,"inherits":21,"process-nextick-args":25,"safe-buffer":41,"timers":46,"util-deprecate":50}],36:[function(require,module,exports){
+},{"./_stream_duplex":63,"./internal/streams/destroy":69,"./internal/streams/stream":70,"_process":58,"core-util-is":50,"inherits":54,"process-nextick-args":57,"safe-buffer":73,"timers":78,"util-deprecate":82}],68:[function(require,module,exports){
 'use strict';
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -6984,7 +9368,7 @@ if (util && util.inspect && util.inspect.custom) {
     return this.constructor.name + ' ' + obj;
   };
 }
-},{"safe-buffer":41,"util":14}],37:[function(require,module,exports){
+},{"safe-buffer":73,"util":47}],69:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -7059,10 +9443,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":25}],38:[function(require,module,exports){
+},{"process-nextick-args":57}],70:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":18}],39:[function(require,module,exports){
+},{"events":51}],71:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7359,7 +9743,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":41}],40:[function(require,module,exports){
+},{"safe-buffer":73}],72:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -7368,7 +9752,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":31,"./lib/_stream_passthrough.js":32,"./lib/_stream_readable.js":33,"./lib/_stream_transform.js":34,"./lib/_stream_writable.js":35}],41:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":63,"./lib/_stream_passthrough.js":64,"./lib/_stream_readable.js":65,"./lib/_stream_transform.js":66,"./lib/_stream_writable.js":67}],73:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -7432,7 +9816,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":15}],42:[function(require,module,exports){
+},{"buffer":48}],74:[function(require,module,exports){
 (function (global){
 var ClientRequest = require('./lib/request')
 var response = require('./lib/response')
@@ -7520,7 +9904,7 @@ http.METHODS = [
 	'UNSUBSCRIBE'
 ]
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./lib/request":44,"./lib/response":45,"builtin-status-codes":16,"url":48,"xtend":52}],43:[function(require,module,exports){
+},{"./lib/request":76,"./lib/response":77,"builtin-status-codes":49,"url":80,"xtend":83}],75:[function(require,module,exports){
 (function (global){
 exports.fetch = isFunction(global.fetch) && isFunction(global.ReadableStream)
 
@@ -7597,7 +9981,7 @@ function isFunction (value) {
 xhr = null // Help gc
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],44:[function(require,module,exports){
+},{}],76:[function(require,module,exports){
 (function (process,global,Buffer){
 var capability = require('./capability')
 var inherits = require('inherits')
@@ -7928,7 +10312,7 @@ var unsafeHeaders = [
 ]
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./capability":43,"./response":45,"_process":26,"buffer":15,"inherits":21,"readable-stream":40,"to-arraybuffer":47}],45:[function(require,module,exports){
+},{"./capability":75,"./response":77,"_process":58,"buffer":48,"inherits":54,"readable-stream":72,"to-arraybuffer":79}],77:[function(require,module,exports){
 (function (process,global,Buffer){
 var capability = require('./capability')
 var inherits = require('inherits')
@@ -8156,7 +10540,7 @@ IncomingMessage.prototype._onXHRProgress = function () {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./capability":43,"_process":26,"buffer":15,"inherits":21,"readable-stream":40}],46:[function(require,module,exports){
+},{"./capability":75,"_process":58,"buffer":48,"inherits":54,"readable-stream":72}],78:[function(require,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = require('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -8235,7 +10619,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
   delete immediateIds[id];
 };
 }).call(this,require("timers").setImmediate,require("timers").clearImmediate)
-},{"process/browser.js":26,"timers":46}],47:[function(require,module,exports){
+},{"process/browser.js":58,"timers":78}],79:[function(require,module,exports){
 var Buffer = require('buffer').Buffer
 
 module.exports = function (buf) {
@@ -8264,7 +10648,7 @@ module.exports = function (buf) {
 	}
 }
 
-},{"buffer":15}],48:[function(require,module,exports){
+},{"buffer":48}],80:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -8998,7 +11382,7 @@ Url.prototype.parseHost = function() {
   if (host) this.hostname = host;
 };
 
-},{"./util":49,"punycode":27,"querystring":30}],49:[function(require,module,exports){
+},{"./util":81,"punycode":59,"querystring":62}],81:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -9016,7 +11400,7 @@ module.exports = {
   }
 };
 
-},{}],50:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 (function (global){
 
 /**
@@ -9087,17 +11471,7 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],51:[function(require,module,exports){
-'use strict';
-
-module.exports = function() {
-  throw new Error(
-    'ws does not work in the browser. Browser clients must use the native ' +
-      'WebSocket object'
-  );
-};
-
-},{}],52:[function(require,module,exports){
+},{}],83:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -9118,1046 +11492,4 @@ function extend() {
     return target
 }
 
-},{}],53:[function(require,module,exports){
-const WebSocket = require('./stream-polyfill');
-const Stream = require('../models/stream');
-const Util = require('../util');
-const Tracer = require('../tracer');
-const EventEmitter = require('events');
-const Model = require('../models/generic-class');
-const Collection = require('../models/generic-collection');
-
-const _stream = Symbol("stream");
-const _source = Symbol("source");
-const _util = Symbol.for("generic-util");
-const _relations = "_relations";
-
-class WappstoStream extends EventEmitter {
-    constructor(stream) {
-        super();
-        this.models = {};
-        this.close = this.close.bind(this);
-        this._collectionAddCallback = this._collectionAddCallback.bind(this);
-        this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
-        this.on('error', () => {});
-        if (stream instanceof Stream) {
-            this[_stream] = stream;
-            stream.on("destoy", this.close);
-        }
-    }
-
-    get stream() {
-        return this[_stream];
-    }
-
-    get socket() {
-        return this[_source];
-    }
-
-    open() {
-        if (this.stream && this.stream.get("meta.id") && WebSocket) {
-            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
-            if (!url.startsWith("http") && window && window.location && window.location.origin) {
-                url = window.location.origin + url;
-            }
-            let ws = new WebSocket(url.replace(/^http/, 'ws'));
-            this._addEventListeners(ws);
-            this[_source] = ws;
-        } else {
-            console.error("cannot connect, stream model not found");
-        }
-    }
-
-    close() {
-        if (this[_source]) {
-            this[_source].ignoreReconnect = true;
-            this[_source].close();
-            this[_source] = null;
-        }
-    }
-
-    _reconnect(keep) {
-        this.close();
-        this.open();
-    }
-
-    _addEventListeners(source) {
-        let self = this,
-            url = self.stream.url().replace(/^http/, 'ws');
-
-        let openTimeout = setTimeout(() => {
-            self._reconnect();
-        }, 5000);
-
-        let pingTiemout;
-        let refreshPingTimer = function(){
-            clearTimeout(pingTiemout);
-            pingTiemout = setTimeout(() => {
-              console.log('connection lost, trying to reconnect to: ' + url);
-              self._reconnect();
-            }, 40000);
-        }
-
-        let reconnect = () => {
-            setTimeout(function() {
-                self._reconnect();
-            }, 5000);
-        }
-
-        source.addEventListener('message', function(e) {
-            let message;
-            try {
-                message = JSON.parse(e.data);
-            } catch (e) {
-                self.emit('message', e);
-                return;
-            }
-            self.emit('message', e);
-            message.forEach((msg) => {
-                if(msg.meta_object.type === 'extsync' && msg.extsync.uri === 'extsync/wappsto/editor/console'){
-                    return;
-                }
-                let traceId = self._checkAndSendTrace(msg);
-                self._handleMessage(msg, traceId);
-            });
-        }, false);
-
-        source.addEventListener('open', function(e) {
-            // Connection was opened.
-            clearTimeout(openTimeout);
-            console.log('stream open: ' + url);
-            self.emit('open', e);
-
-            if(!(typeof window === 'object') || !(window.document && window.WebSocket)){
-                // Add ping timeout
-                refreshPingTimer();
-            }
-        }, false);
-
-        source.addEventListener('error', function(e) {
-            try {
-              self.emit('error', e);
-            } catch (e) {
-              self.emit('error');
-            }
-            console.log('stream error: ' + url);
-        }, false);
-
-        source.addEventListener('close', function(e) {
-            console.log('stream closed: ' + url);
-            clearTimeout(openTimeout);
-            clearTimeout(pingTiemout);
-            self.emit('close', e);
-            if(!source.ignoreReconnect){
-                reconnect();
-            }
-        }, false);
-
-        source.addEventListener('ping', function(e) {
-            refreshPingTimer();
-        });
-    }
-
-    _checkAndSendTrace(message) {
-        if (message.hasOwnProperty('meta') && message.meta.hasOwnProperty('trace')) {
-            return Tracer.sendTrace(this.stream.util.session, message.meta.trace, null, null, {
-                'stream_id': message.meta.id
-            });
-        }
-    }
-
-    _handleMessage(message, traceId) {
-        let id, models, options, event = message.event;
-        if (traceId) {
-            options = {
-                trace: traceId
-            };
-        }
-        switch (event) {
-            case "create":
-                if (message.meta_object.type === "notification") {
-                    this._handleNotification(message.notification, options);
-                } else {
-                    if(!this._updateModel(message, options)){
-                        id = message.path.split("/");
-                        let last = id[id.length - 1];
-                        id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
-                        models = this.models[id];
-                        if (models) {
-                          let type = message.meta_object.type;
-                          models.forEach((model) => {
-                            let newModel = model.get(type).add(message[type], options);
-                            this.addModel(newModel);
-                          });
-                        }
-                    }
-                }
-                break;
-            case "update":
-                this._updateModel(message, options);
-                break;
-            case "delete":
-                id = message.meta_object.id;
-                models = this.models[id];
-                if (models) {
-                    models.forEach((model) => {
-                      model.emit("destroy", model, options);
-                      this.removeModel(model);
-                    });
-                }
-                break;
-
-        }
-    }
-
-    _updateModel(message, options) {
-        let id = message.meta_object.id;
-        let models = this.models[id];
-        if (models) {
-            models.forEach((model) => {
-              model.emit("stream:message", model, message[message.meta_object.type], message);
-              model.set(message[message.meta_object.type], options);
-            });
-            return true;
-        }
-        return false;
-    }
-
-    _handleNotification(notification, options) {
-        switch (notification.base.code) {
-            case 1100004:
-                this.emit("permission:added", notification.base.type_ids, notification.base.ids, options);
-                break;
-            case 1100013:
-                this.emit("permission:updated", notification.base.type_ids, notification.base.ids, options);
-                break;
-            case 1100006:
-                this.emit("permission:removed", notification.base.type_ids, notification.base.ids, options);
-                break;
-            case 1100007:
-                this.emit("permission:revoked", notification.base.type_ids, notification.base.ids, options);
-                break;
-
-        }
-    }
-
-    subscribe(arr, options = {}) {
-        if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
-            return;
-        }
-        if(arr.constructor !== Array && !(arr instanceof Collection)){
-            arr = [arr];
-        }
-        let subscriptions = [];
-        let models = [];
-        arr.forEach((obj) => {
-            let { path, isModel } = this._getPath(obj);
-            if(path){
-                subscriptions.push(path);
-                if(isModel){
-                    models.push(obj);
-                }
-            }
-        });
-        if(subscriptions.length === 0) return;
-        // DO NOT UPDATE IF IT IS THE SAME SUBSCRIPTIONS
-        // AND MAKE SURE COLLECTION ADD AND REMOVE LISTENERS ARE ADDED ONLY ONCE !!!
-        let requestOptions = Object.assign({}, options);
-        requestOptions.success = () => {
-            models.forEach((obj) => this.addModel(obj));
-            if (options.success) {
-                options.success.apply(this, arguments);
-            }
-        }
-        return this._updateSubscriptions([...this.stream.get("subscription"), ...subscriptions], requestOptions);
-    }
-
-    unsubscribe(arr, options) {
-        if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
-            return;
-        }
-        if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
-            arr = [arr];
-        }
-        let update = false;
-        let subscriptions = [...this.stream.get("subscription")];
-        arr.forEach((obj) => {
-            let { path, isModel } = this._getPath(obj);
-            if(path){
-                let index = subscriptions.indexOf(path);
-                if (isModel) {
-                    this.removeModel(obj);
-                }
-                if (index !== -1) {
-                    subscriptions.splice(index, 1);
-                    update = true;
-                }
-            }
-        });
-        if(update){
-            return this._updateSubscriptions(subscriptions, options);
-        } else if(options.success){
-            options.success.call(this.stream, this.stream, this.stream.toJSON(), {});
-        }
-    }
-
-    _getModelUrl(model) {
-        return model.url({
-            full: false
-        }).replace(model.util.baseUrl, "");
-    }
-
-    addModel(model) {
-        this._forAllModels(model, this._addModelToCache.bind(this), this._addCollectionListener.bind(this));
-    }
-
-    removeModel(model) {
-        this._forAllModels(model, this._removeModelFromCache.bind(this), this._removeCollectionListener.bind(this));
-    }
-
-    _forAllModels(model, modelFunc, collectionFunc) {
-        let arr = [model];
-        while (arr.length != 0) {
-            let temp = [];
-            arr.forEach((m) => {
-                modelFunc(m);
-                if (m.constructor[_relations]) {
-                    m.constructor[_relations].forEach(({
-                        key,
-                        type,
-                        relatedClass
-                    }) => {
-                        if (type === Util.type.One) {
-                            temp = [...temp, m.get(key)];
-                        } else if (type === Util.type.Many) {
-                            let col = m.get(key);
-                            collectionFunc(col);
-                            temp = [...temp, ...col.models];
-                        }
-                    });
-                }
-            });
-            arr = temp;
-        }
-    }
-
-    _addModelToCache(model) {
-        let id = model.get("meta.id");
-        if (!this.models.hasOwnProperty(id)) {
-          this.models[id] = [model];
-        } else {
-          if(this.models[id].indexOf(model) === -1){
-            this.models[id].push(model);
-          }
-        }
-    }
-
-    _removeModelFromCache(model) {
-        let id = model.get("meta.id");
-        if(this.models[id]){
-          let index = this.models[id].indexOf(model);
-          if(index !== -1){
-            this.models[id].splice(index, 1);
-            if(this.models[id].length === 0){
-              delete this.models[id];
-            }
-          }
-        }
-    }
-
-    _addCollectionListener(collection){
-        collection.on("add", this._collectionAddCallback);
-        collection.on("remove", this._collectionRemoveCallback);
-    }
-
-    _removeCollectionListener(){
-        collection.off("add", this._collectionAddCallback);
-        collection.off("remove", this._collectionRemoveCallback);
-    }
-
-    _collectionAddCallback(collection, model, options){
-        this.addModel(model);
-    }
-
-    _collectionRemoveCallback(collection, model, options){
-        this.removeModel(model);
-    }
-
-    _updateSubscriptions(subscription, options) {
-        this.stream.set("subscription", subscription);
-        return this.stream.save({
-            subscription,
-            full: true
-        }, {
-            wait: true,
-            patch: true,
-            success: options.success,
-            error: options.error,
-            complete: options.complete
-        });
-    }
-
-    _getPath(obj) {
-        let isObject = obj instanceof Object;
-        let isString = typeof(obj) === "string";
-        if (!isObject && !isString) {
-            console.error("argument must be a string, an object or a class");
-            return {
-                path: undefined,
-                isModel: false,
-                isString: false
-            };
-        }
-        let path;
-        let isModel = obj.constructor.prototype instanceof Model;
-        if (isModel) {
-            path = this._getModelUrl(obj);
-        } else if (isObject) {
-            path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
-        } else {
-            path = obj;
-        }
-        return {
-            path,
-            isModel,
-            isString
-        };
-    }
-}
-
-module.exports = WappstoStream;
-
-},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":55,"../util":56,"./stream-polyfill":54,"events":18}],54:[function(require,module,exports){
-let WebSocket;
-if(typeof window === 'object' && window.document && window.WebSocket){
-    WebSocket = window.WebSocket;
-} else {
-    WebSocket = require('ws');
-}
-
-module.exports = WebSocket;
-
-},{"ws":51}],55:[function(require,module,exports){
-let fetch;
-let baseUrl;
-let isBrowser;
-
-let tracer = {
-    globalTrace: false,
-    params: {
-        name: null,
-        parent: null
-    },
-    sendTrace: function(session, parent, id, name, data, status) {
-        if(!name){
-            if (this.params && this.params.name) {
-                name = this.params.name;
-            } else {
-                name = "WS_APP_BACKGROUND";
-            }
-        }
-        if (id === null) {
-            id = 'WS_APP_BACKGROUND_' + Math.floor(Math.random() * 1000000 + 1);
-        }
-        var str = '';
-        for (let k in data) {
-            let v = data[k];
-            if (typeof v !== 'string') {
-                v = JSON.stringify(v);
-            }
-            str += '&' + k + '=' + encodeURIComponent(v);
-        }
-        if (!status) {
-            status = 'ok';
-        }
-        name = encodeURIComponent(name);
-        var uri = 'id=' + id + '&name=' + name + '&status=' + status + str;
-        if (parent) {
-            uri = 'parent=' + parent + '&' + uri;
-        } else if (this.params && this.params.parent) {
-            uri = 'parent=' + this.params.parent + '&' + uri;
-        }
-        fetch(through + 'tracer.iot.seluxit.com/trace?' + (isBrowser ? 'x-session=' + session + '&' : '') + uri);
-        return id;
-    }
-}
-
-if(typeof window === 'object' && window.document && window.fetch){
-  const originalFetch = window.fetch;
-  window.fetch = function(req, options){
-    checkAndSendTrace(req, options);
-    return originalFetch.apply(this, arguments);
-  }
-  window.Tracer = tracer;
-  fetch = originalFetch;
-  through = "/external/";
-  isBrowser = true;
-  let search = window.location.search;
-  let traceIndex = search.indexOf("trace");
-  if(traceIndex !== -1){
-    let slice = window.location.search.slice(window.location.search.indexOf("trace") + 6)
-    let value = slice.slice(0, slice.indexOf("&"));
-    if(value === "true"){
-      tracer.globalTrace = true;
-    }
-  }
-} else {
-  const http = require('http');
-  const https = require('https');
-
-  // Overriding http and https
-  const originalRequest = {
-      http: {
-          request: http.request,
-          get: http.get
-      },
-      https: {
-          request: https.request,
-          get: https.get
-      }
-  };
-
-  const overrideRequest = function(protocol, strName) {
-      protocol.request = function(req, options) {
-          checkAndSendTrace(req, options);
-          return originalRequest[strName].request.apply(this, arguments);
-      }
-      protocol.get = function(req, options) {
-          checkAndSendTrace(req, options);
-          return originalRequest[strName].get.apply(this, arguments);
-      }
-  };
-
-  overrideRequest(http, 'http');
-  overrideRequest(https, 'https');
-
-  fetch = originalRequest["https"].get;
-  through = "https://";
-  isBrowser = false;
-}
-
-const checkAndSendTrace = function(req = {}, options = {}) {
-    let path, method, nodeName;
-    if (req.constructor === String) {
-        path = req.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
-        if(path.indexOf('/') !== -1){
-            path = path.split('/').slice(1).join('/') || '';
-        } else {
-            path = path.split('?')[1] || '';
-        }
-        method = options.method || 'GET';
-        session = options.headers && options.headers["x-session"];
-    } else if(Object.prototype.toString.call(req) === "[object Object]"){
-        path = req.path;
-        method = req.method || 'GET';
-        options = req;
-        session = req.headers && req.headers["x-session"];
-    }
-    if(!path || !session){
-      return;
-    }
-    if(tracer.params && tracer.params.name){
-        nodeName = tracer.params.name + "_" + method + '_' + path;
-    } else {
-        nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
-    }
-    if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
-        // Removing trace_parent from path
-        var splitPath = path.split('?');
-        var queryData = {};
-        var tracing = false;
-        if (splitPath.length > 1) {
-            // Converting query to object
-            var query = splitPath[1].split('&');
-            var origin = splitPath[0];
-            query.forEach(function(q) {
-                q = q.split('=');
-                queryData[q[0]] = q[1];
-            });
-
-            var parentNode = queryData['trace_parent'];
-            nodeId = queryData['trace'];
-            if (nodeId) {
-                // Clean and reconstruct
-                delete queryData['trace_parent'];
-                var newQuery = '';
-                for(let key in queryData){
-                    newQuery += key + '=' + queryData[key] + '&';
-                }
-                if (newQuery.length) {
-                    newQuery = '?' + newQuery;
-                    newQuery = newQuery.slice(0, -1);
-                }
-
-                path = origin + newQuery;
-                var splitOrigin = origin.split('/');
-                tracer.sendTrace(session, parentNode, nodeId, nodeName, { query: queryData }, 'ok');
-                tracing = true;
-            }
-        }
-
-        if (!tracing && tracer.globalTrace === true && session && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
-            var id = tracer.sendTrace(session, parentNode, null, nodeName, { method, path }, 'ok');
-            path += '?trace=' + id;
-        }
-
-        options.path = path;
-    }
-};
-
-module.exports = tracer;
-
-},{"http":42,"https":19}],56:[function(require,module,exports){
-(function (process){
-let baseUrl, session;
-if(typeof window === 'object' && window.document){
-    baseUrl = "/services";
-    session = window.sessionStorage.getItem("sessionID");
-    if(!session){
-      let readCookie = function(name){
-        var nameEQ = name + '=';
-        var ca = window.document.cookie.split(';');
-        for (var i = 0; i < ca.length; i++) {
-            var c = ca[i];
-            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-        }
-        return null;
-      }
-      session = readCookie("sessionID");
-    }
-} else {
-    baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
-    session = process.env.sessionID;
-}
-
-module.exports = {
-    baseUrl: baseUrl,
-    version: "2.0",
-    type: {
-        One: Symbol.for('one'),
-        Many: Symbol.for('many')
-    },
-    isUUID: function(data) {
-        try {
-            if (data.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-b8-9][a-f0-9]{3}-[a-f0-9]{12}$/i).length > 0) {
-                return true;
-            }
-        } catch (err) {}
-        return false;
-    },
-    extend: function(util) {
-        let newUtil = Object.assign({}, util);
-        if (!newUtil.session) {
-            if(!session){
-                throw new Error("session is required");
-            }
-            newUtil.session = session;
-        }
-        if (!newUtil.version) {
-            newUtil.version = this.version;
-        }
-        if (!newUtil.baseUrl) {
-            newUtil.baseUrl = this.baseUrl;
-        }
-        return newUtil;
-    },
-    throw: function(response){
-      process.on('unhandledRejection', up => { throw up });
-      throw response;
-    }
-}
-
-}).call(this,require('_process'))
-},{"_process":26}],57:[function(require,module,exports){
-const querystring = require('querystring');
-
-const Models = require('../models');
-const Stream = require('../stream');
-const Util = require('../util');
-
-const Request = require('./request');
-
-const _util = Symbol.for("generic-util");
-const _wappstoModels = Symbol("wappstoModels");
-const _Stream = Symbol("Stream");
-const _class = "defaultModel";
-const _className = Symbol.for("generic-collection-className");
-const _requestInstance = "_requestInstance";
-
-class Wappsto {
-  constructor(request) {
-    if(request instanceof Request){
-        this[_requestInstance] = request
-    } else {
-        this[_requestInstance] = new Request(request, this);
-    }
-    this[_wappstoModels] = new Models(this[_requestInstance]);
-    this[_Stream] = Stream;
-  }
-
-  get util() {
-    return this[_requestInstance][_util];
-  }
-
-  get models() {
-    return this[_wappstoModels];
-  }
-
-  get Stream() {
-    return this[_Stream];
-  }
-
-  get wStream(){
-    return this[_requestInstance]._wStream;
-  }
-
-  set wStream(wStream){
-    this[_requestInstance]._wStream = wStream;
-  }
-
-  create(type, obj = {}, options){
-      if(!type || !this.models[type]){
-          console.error("you must specify a model type");
-          return;
-      }
-
-      let model = new this.models[type]();
-      model.save(obj, options);
-  }
-
-  get(searchIn, searchObj, options = {}) {
-      // Checking searchIn
-      if(!searchIn){
-        console.error("you must specify a service");
-        return false;
-      }
-
-      // Checking quantity
-      if(options.hasOwnProperty("quantity")){
-        let quantity = options.quantity;
-        if((isNaN(quantity) &&  quantity !== "all") || (!isNaN(quantity) && parseInt(quantity) < 1)){
-          console.error("quantity must be a positive number");
-          return false;
-        }
-      }
-
-      let data = this._getOptionsData(searchObj, options);
-      data = querystring.stringify(data);
-
-      let collection = new this.models.Collection();
-      collection[_className] = searchIn;
-      let M = searchIn.charAt(0).toUpperCase() + searchIn.slice(1);
-      M = this.models[M];
-
-      if (M) {
-        collection[_class] = M;
-      }
-
-      let requestOptions = Object.assign({}, options, {
-        url: this.util.baseUrl + "/" + searchIn + "?" + data
-      });
-      collection.fetch(requestOptions);
-  }
-
-  _getOptionsData(searchObj, options) {
-    let tempObj = {
-      method: options.method || ["retrieve", "update"]
-    };
-    for (let key in searchObj) {
-      let val = searchObj[key];
-      if (val !== undefined && val !== null) {
-        if (key == "_parent" && val instanceof Object) {
-          for (let k in val) {
-            tempObj["parent_" + k] = val[k];
-          }
-        } else {
-          tempObj["this_" + key] = val;
-        }
-      }
-    }
-    if (options.quantity) {
-      tempObj.quantity = options.quantity;
-    }
-    if (options.expand) {
-      tempObj.expand = options.expand;
-    }
-    if (options.message) {
-      tempObj.message = options.message;
-    }
-    return tempObj;
-  }
-
-  initializeStream(streamJSON, options = {}) {
-    let models = [];
-    let searchFor = {};
-    if(!streamJSON){
-      streamJSON = {};
-    } else if(streamJSON.constructor === Array){
-      let paths = [];
-      streamJSON.forEach((obj) => {
-        if(obj instanceof this.models.Model){
-          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
-          paths.push(url);
-          models.push(obj);
-        } else if(obj.constructor === Object){
-          path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
-          if(path){
-            paths.push(path);
-          }
-        }
-      });
-      streamJSON = {
-        subscription: paths
-      };
-    }
-    if(streamJSON.name){
-      searchFor = {
-        name: streamJSON.name
-      }
-    }
-    this.get('stream', searchFor, {
-      expand: 1,
-      success: (streamCollection) => {
-        if (streamCollection.length > 0) {
-          if (!streamJSON.hasOwnProperty('full')) {
-              streamJSON.full = true;
-          }
-          let stream = streamCollection.first();
-
-          // merging with json
-          let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
-
-          if(newJSON){
-            stream.save(newJSON, {
-              patch: true,
-              success: () => {
-                this._startStream(stream, models, options);
-              },
-              error: options.error
-            });
-          } else {
-            this._startStream(stream, models, options);
-          }
-        } else {
-          this._createStream(streamJSON, models, options);
-        }
-      },
-      error: options.error
-    });
-  }
-
-  _mergeStreams(oldJSON, newJSON){
-    let update = false;
-    if(newJSON.subscription){
-      newJSON.subscription.forEach((sub) => {
-        if(oldJSON.subscription.indexOf(sub) === -1){
-          update = true;
-          oldJSON.subscription.push(sub);
-        }
-      });
-    }
-    if(newJSON.ignore){
-      newJSON.ignore.forEach((sub) => {
-        if(oldJSON.ignore.indexOf(sub) === -1){
-          update = true;
-          oldJSON.ignore.push(sub);
-        }
-      });
-    }
-    if(oldJSON.full !== newJSON.full){
-      update = true;
-      oldJSON = newJSON.full;
-    }
-    return update ? oldJSON : undefined;
-  }
-
-  _createStream(streamJSON, models, options) {
-    let stream = new this.models.Stream(streamJSON);
-    stream.save({}, {
-        success: () => {
-            this._startStream(stream, models, options);
-        },
-        error: options.error
-    });
-  }
-
-  _startStream(stream, models, options){
-    let wStream = new this.Stream(stream);
-    wStream.open();
-    if(options.subscribe === true){
-      wStream.subscribe(models);
-    }
-    if(options.success){
-      options.success(wStream);
-    }
-  }
-}
-
-try {
-  if (typeof window === 'object' && window.document) {
-    window.Wappsto = Wappsto;
-  }
-} catch (e) {
-
-}
-
-module.exports = Wappsto;
-
-},{"../models":5,"../stream":53,"../util":56,"./request":58,"querystring":30}],58:[function(require,module,exports){
-const Request = require('../models/request');
-const StreamModel = require('../models/stream');
-const Collection = require('../models/generic-collection');
-
-const _class = "defaultModel";
-const _className = Symbol.for("generic-collection-className");
-
-const STATUS = {
-  ACCEPTED: "accepted", // user accepted the request
-  PENDING: "pending",   // waiting for restservice
-  WAITING: "waiting"    // waiting for user to accept
-}
-
-let callStatusChange = function(options, status){
-  if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
-    options.onStatusChange.call(this, status);
-  }
-};
-
-class WappstoRequest extends Request {
-  constructor(util, wappsto){
-    super(util);
-    this._wappsto = wappsto;
-    this._waitFor = {};
-  }
-
-  send(context, options){
-    if(context instanceof StreamModel || (context[_class] && context[_class].prototype instanceof StreamModel) || context[_className] === "stream"){
-      return super.send.apply(this, arguments);
-    }
-    return new Promise((resolve, reject) => {
-      callStatusChange.call(context, options, STATUS.PENDING);
-      return this._wrapRequest(context, options, resolve, reject);
-    });
-  }
-
-  _wrapRequest(context, options, resolveRequest, rejectRequest){
-    if(this._wStreamPromise){
-      this._wStreamPromise.then(() => {
-        this._makeRequest(context, options, resolveRequest, rejectRequest);
-      }).catch((context, response) => {
-        rejectRequest(response);
-      });
-    } else {
-      this._wStreamPromise = new Promise((resolve, reject) => {
-        this._wappsto.initializeStream({
-          name: (typeof window === 'object' && window.document) ? "wapp-api-stream-foreground" : "wapp-api-stream-background",
-          subscription: ["/notification"],
-          full: true
-        }, {
-          success: (wStream) => {
-            this._wStream = wStream;
-            this._addPermissionListener(wStream);
-            resolve(wStream);
-            this._makeRequest(context, options, resolveRequest, rejectRequest);
-          },
-          error: (context, response) => {
-            this._wStreamPromise = null;
-            reject([context, response]);
-          }
-        });
-      }).catch(([context, response]) => {
-        rejectRequest(response);
-      });
-    }
-  }
-
-  _makeRequest(context, options, resolve, reject){
-    super.send(context, options).then((response) => {
-      this._handleResponse(context, options, response, resolve, reject);
-    });
-  }
-
-  _handleResponse(context, options, response, resolve, reject){
-    if(response.ok){
-      response.clone().json().then((json) => {
-        this._handleSuccess(context, options, json, response, resolve, reject);
-      });
-    } else {
-      this._handleError(context, options, response, resolve, reject);
-    }
-  }
-
-  _handleSuccess(context, options, json, response, resolve, reject){
-    if(context instanceof Collection && options.method === "GET" && ((options.query && options.query.indexOf("quantity") !== -1) || (options.url && options.url.indexOf("quantity") !== -1))){
-      let quantity = (options.query && options.query.split("quantity=")[1].split("&")[0]) || options.url.split("quantity=")[1].split("&")[0];
-      let searchIn = options.url.split("/services/")[1].split("/")[0].split("?")[0];
-      let length;
-      if(json instanceof Array){
-        length = json.length;
-      } else {
-        length = json.id && json.id.length;
-      }
-      if(length < quantity){
-        callStatusChange.call(context, options, STATUS.WAITING);
-        this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
-      } else {
-        callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
-        context.on("response:handled", () => {
-          if(options.subscribe === true && this._wStream){
-            this._wStream.subscribe(context);
-          }
-        });
-        resolve(response);
-      }
-    } else {
-        callStatusChange.call(context, options, STATUS.ACCEPTED);
-        context.on("response:handled", () => {
-          if(options.subscribe === true && this._wStream){
-            this._wStream.subscribe(context);
-          }
-        });
-        resolve(response);
-    }
-  }
-
-  _handleError(context, options, response, resolve, reject){
-    if(response.text){
-      response.clone().json()
-        .then((json) => {
-          if(json && [400013, 400008].indexOf(json.code) !== -1){
-              callStatusChange.call(context, options, STATUS.WAITING);
-              this._waitFor.installation = [...(this._waitFor.installation || []), {context: context, options: options, resolve: resolve, reject: reject}];
-          } else if(options.error){
-              reject(response);
-          }
-        })
-        .catch((error) => {
-          reject(response);
-        });
-    } else {
-      reject(response);
-    }
-  }
-
-  _addPermissionListener(wStream) {
-    wStream.on("permission:added", (type, ids) => {
-      if(this._waitFor[type]){
-        this._waitFor[type].forEach((obj) => {
-          if(!obj.options){
-            obj.options = {};
-          }
-          obj.options.onlySuccess = true;
-          this._makeRequest(obj.context, obj.options, obj.resolve, obj.reject);
-        });
-        delete this._waitFor[type];
-      }
-    });
-  }
-}
-
-module.exports = WappstoRequest;
-
-},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}]},{},[57]);
+},{}]},{},[44]);
