@@ -6,7 +6,7 @@ const Request = require('./request');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
 const _collections = Symbol.for("generic-class-collections");
-const _name = Symbol("generic-class-name");
+const _name = Symbol.for("generic-class-name");
 const _parent = Symbol.for("generic-collection-parent");
 const _util = Symbol.for("generic-util");
 const _class = "defaultModel";
