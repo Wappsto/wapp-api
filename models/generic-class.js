@@ -216,6 +216,7 @@ class Generic extends EventEmitter {
           let data = this.parse(response.data);
           this.set(data, options);
         }
+        response.responseJSON = response.data;
         this.emit("response:handled", this, response.data, response);
         this._fireResponse("success", this, [this, response.data, response], options);
       })
@@ -224,6 +225,7 @@ class Generic extends EventEmitter {
           Util.throw(response);
         }
         responseFired = true;
+        response.responseJSON = response.response.data;
         this._fireResponse("error", this, [this, response], options);
       });
     }
