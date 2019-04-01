@@ -594,6 +594,7 @@ class Collection extends EventEmitter {
           responseFired = true;
           let data = this.parse(response.data);
           this.add(data);
+          response.responseJSON = response.data;
           this.emit("response:handled", this, response.data, response);
           this._fireResponse("success", this, [this, response.data, response], options);
         })
@@ -602,6 +603,7 @@ class Collection extends EventEmitter {
             Util.throw(response);
           }
           responseFired = true;
+          response.responseJSON = response.response.data;
           this._fireResponse("error", this, [this, response], options);
         });
     }
