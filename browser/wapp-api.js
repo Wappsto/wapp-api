@@ -691,12 +691,13 @@ class Collection extends EventEmitter {
 
     reset(options){
       let result = [];
-      this.each((e) => {
+      for(let i = 0; i < this.models.length; i++){
         let removed = this.remove(e, options);
         if(removed){
           result.push(removed);
+          i--;
         }
-      });
+      }
       return result;
     }
 }
