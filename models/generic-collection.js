@@ -349,9 +349,9 @@ class Collection extends EventEmitter {
         return val;
     }
 
-    reset(){
+    reset(options){
       this.each((e) => {
-        this.remove(e);
+        this.remove(e, options);
       });
     }
 }
