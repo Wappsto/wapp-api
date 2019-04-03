@@ -417,6 +417,7 @@ class Collection extends EventEmitter {
                   id: element
                 }
               };
+              id = element;
             } else if(element.constructor === Array){
               return;
             } else {
