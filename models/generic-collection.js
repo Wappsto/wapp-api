@@ -66,11 +66,13 @@ class Collection extends EventEmitter {
             isArray = false;
         }
         data.forEach((element, index) => {
+            let id, lookFor;
             if(element.constructor === Object){
               if(this.models.includes(element)){
                   results.push(element);
                   return;
               }
+              id = element.meta && element.meta.id
             } else if(element.constructor === String){
               element = {
                 meta: {
@@ -79,8 +81,15 @@ class Collection extends EventEmitter {
               };
             } else if(element.constructor === Array){
               return;
+            } else {
+              id = element.get("meta.id");
             }
-            let found = this.find(element, options);
+            if(id){
+              lookFor = { meta: { id: id }};
+            } else {
+              lookFor = element
+            }
+            let found = this.find(lookFor, options);
             if (found) {
                 if(found instanceof Generic){
                     found.set(element, options);
