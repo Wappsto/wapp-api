@@ -688,6 +688,12 @@ class Collection extends EventEmitter {
         }
         return val;
     }
+
+    reset(){
+      this.each((e) => {
+        this.remove(e);
+      });
+    }
 }
 
 module.exports = Collection;
