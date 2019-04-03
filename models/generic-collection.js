@@ -155,8 +155,8 @@ class Collection extends EventEmitter {
             return element == obj;
         });
         if (index != -1) {
-            let result = this.models.splice(index, 1);
-            this.emit("remove", this, result[0], options);
+            let result = this.models.splice(index, 1)[0];
+            this.emit("remove", this, result, options);
             if(result instanceof Generic){
                 result.removeListener("destroy", this._onModelDestroy);
             }
