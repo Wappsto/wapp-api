@@ -692,7 +692,8 @@ class Collection extends EventEmitter {
     reset(options){
       let result = [];
       for(let i = 0; i < this.models.length; i++){
-        let removed = this.remove(e, options);
+        let model = this.models[i];
+        let removed = this.remove(model, options);
         if(removed){
           result.push(removed);
           i--;
