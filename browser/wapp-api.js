@@ -299,7 +299,9 @@ class Generic extends EventEmitter {
     destroy(options = {}) {
         let success = options.success;
         options.success = (jsonResponse) => {
-            success.call(this, this, jsonResponse);
+            if(success){
+              success.call(this, this, jsonResponse);
+            }
             this[_collections].forEach((col) => {
                 col.remove(this);
             });
