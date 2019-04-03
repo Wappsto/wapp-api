@@ -351,7 +351,7 @@ class WappstoStream extends EventEmitter {
         collection.on("remove", this._collectionRemoveCallback);
     }
 
-    _removeCollectionListener(){
+    _removeCollectionListener(collection){
         collection.off("add", this._collectionAddCallback);
         collection.off("remove", this._collectionRemoveCallback);
     }
