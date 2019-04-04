@@ -215,7 +215,10 @@ class Collection extends EventEmitter {
     find(obj, options = {}) {
         return this.models.find((element) => {
             let lookElement;
-            if(options.xhr && ((element instanceof Generic && !element.get("meta.id")) || !element.meta || !element.meta.id)){
+            if(options.xhr && (
+              (element instanceof Generic && !element.get("meta.id")) ||
+              (!(element instanceof Generic ) && (!element.meta || !element.meta.id))
+            )){
                 options.create = true;
                 lookElement = this._getLookElement(obj);
             } else {
