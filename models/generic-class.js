@@ -248,6 +248,9 @@ class Generic extends EventEmitter {
         }
         responseFired = true;
         response.responseJSON = response.response.data;
+        if(!options.error || options.error.constructor !== Function){
+          throw response;
+        }
         this._fireResponse("error", this, [this, response], options);
       });
     }

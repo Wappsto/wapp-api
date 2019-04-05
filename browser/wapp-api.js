@@ -282,6 +282,9 @@ class Generic extends EventEmitter {
         }
         responseFired = true;
         response.responseJSON = response.response.data;
+        if(!options.error || options.error.constructor !== Function){
+          throw response;
+        }
         this._fireResponse("error", this, [this, response], options);
       });
     }
@@ -643,12 +646,15 @@ class Collection extends EventEmitter {
           }
           responseFired = true;
           response.responseJSON = response.response.data;
+          if(!options.error || options.error.constructor !== Function){
+            throw response;
+          }
           this._fireResponse("error", this, [this, response], options);
         });
     }
 
     _fireResponse(type, context, args, options) {
-      if (options[type]) {
+      if (options[type] && options[type].constructor === Function) {
         options[type].apply(context, args);
       }
       if (options.complete) {
