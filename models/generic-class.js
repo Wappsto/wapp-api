@@ -123,7 +123,7 @@ class Generic extends EventEmitter {
     set(data, value, options) {
         if (Object.prototype.toString.call(data) == "[object Object]") {
             options = value;
-            if(options && (options.method === "PUT" || options.replace === true)){
+            if(options && (options.method === "PUT" || options.merge === false)){
               this._removeOldAttributes();
             }
             let events = [];
@@ -216,11 +216,14 @@ class Generic extends EventEmitter {
             attributes = Object.keys(this.attributes);
         }
         attributes.forEach((attr) => {
-            if (this.get(attr) instanceof Generic || this.get(attr) instanceof Collection) {
-                json[attr] = this.get(attr).toJSON(options);
+          if(this.attributes.hasOwnProperty(attr)){
+            let val = this.get(attr);
+            if (val instanceof Generic || val instanceof Collection) {
+                json[attr] = val.toJSON(options);
             } else {
-                json[attr] = this.get(attr);
+                json[attr] = val;
             }
+          }
         });
         return json;
     }
@@ -275,7 +278,7 @@ class Generic extends EventEmitter {
                 options.method = "POST";
                 options.create = true;
             }
-            if(options.replace !== true){
+            if(options.merge !== false){
               data = Object.assign({}, this.toJSON(options), data);
             }
             options.data = JSON.stringify(data);
