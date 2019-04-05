@@ -164,6 +164,7 @@ class Generic extends EventEmitter {
     }
 
     _removeOldAttributes(){
+      let version = this.attributes.meta && this.attributes.meta.version;
       let attributes = (this.constructor[_pickAttributes] && this.constructor[_pickAttributes][version]) || Object.keys(this.attributes);
       attributes.forEach(attr => {
         if (this.constructor[_relations]) {
