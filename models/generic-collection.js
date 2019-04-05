@@ -272,6 +272,7 @@ class Collection extends EventEmitter {
           response.responseJSON = response.data;
           this.emit("response:handled", this, response.data, response);
           this._fireResponse("success", this, [this, response.data, response], options);
+          return this;
         })
         .catch((response) => {
           if (responseFired) {

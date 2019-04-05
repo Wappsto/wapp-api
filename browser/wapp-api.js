@@ -275,6 +275,7 @@ class Generic extends EventEmitter {
         response.responseJSON = response.data;
         this.emit("response:handled", this, response.data, response);
         this._fireResponse("success", this, [this, response.data, response], options);
+        return this;
       })
       .catch((response) => {
         if (responseFired) {
@@ -639,6 +640,7 @@ class Collection extends EventEmitter {
           response.responseJSON = response.data;
           this.emit("response:handled", this, response.data, response);
           this._fireResponse("success", this, [this, response.data, response], options);
+          return this;
         })
         .catch((response) => {
           if (responseFired) {
@@ -3481,7 +3483,7 @@ class WappstoRequest extends Request {
     if(response.response.data && response.response.data.code && [400013, 400008].indexOf(response.response.data.code) !== -1){
         callStatusChange.call(context, options, STATUS.WAITING);
         this._waitFor.installation = [...(this._waitFor.installation || []), {context: context, options: options, resolve: resolve, reject: reject}];
-    } else if(options.error){
+    } else {
         reject(response);
     }
   }
