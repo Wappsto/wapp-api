@@ -157,7 +157,7 @@ class Generic extends EventEmitter {
     set(data, value, options) {
         if (Object.prototype.toString.call(data) == "[object Object]") {
             options = value;
-            if(options.method === "PUT" || options.replace === true){
+            if(options && (options.method === "PUT" || options.replace === true)){
               this._removeOldAttributes();
             }
             let events = [];
