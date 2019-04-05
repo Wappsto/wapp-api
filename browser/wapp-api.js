@@ -156,6 +156,10 @@ class Generic extends EventEmitter {
 
     set(data, value, options) {
         if (Object.prototype.toString.call(data) == "[object Object]") {
+            options = value;
+            if(options.method === "PUT" || options.replace === true){
+              this._removeOldAttributes();
+            }
             let events = [];
             let oldValue = Object.assign({}, this.attributes);
             for (let key in data) {
@@ -169,13 +173,13 @@ class Generic extends EventEmitter {
                         if (relation.type === Util.type.One) {
                             this.get(key).set(data[key]);
                         } else if (relation.type === Util.type.Many) {
-                            this.get(key).push(data[key], value);
+                            this.get(key).push(data[key], options);
                         }
                     } else {
-                        event = this._set(key, data[key], value);
+                        event = this._set(key, data[key], options);
                     }
                 } else {
-                    event = this._set(key, data[key], value);
+                    event = this._set(key, data[key], options);
                 }
                 if(event){
                   events.push(event);
@@ -191,6 +195,20 @@ class Generic extends EventEmitter {
               this.emit("change", this, event.newValue, event.oldValue, event.key, options);
             }
         }
+    }
+
+    _removeOldAttributes(){
+      let attributes = (this.constructor[_pickAttributes] && this.constructor[_pickAttributes][version]) || Object.keys(this.attributes);
+      attributes.forEach(attr => {
+        if (this.constructor[_relations]) {
+            let found = this.constructor[_relations].find(({ key }) => key === attr);
+            if(!found) {
+              delete this.attributes[attr];
+            }
+        } else {
+          delete this.attributes[attr];
+        }
+      });
     }
 
     _set(key, value, options) {
@@ -290,8 +308,10 @@ class Generic extends EventEmitter {
                 options.method = "POST";
                 options.create = true;
             }
-            let body = Object.assign({}, this.toJSON(options), data);
-            options.data = JSON.stringify(body);
+            if(options.replace !== true){
+              data = Object.assign({}, this.toJSON(options), data);
+            }
+            options.data = JSON.stringify(data);
         }
         return this._request(options);
     }
