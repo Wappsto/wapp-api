@@ -10,8 +10,9 @@ class State extends Generic{
       options.method = "GET";
       options.url = this.util.baseUrl + "/log/" + this.get("meta.id") + "?type=" + this[_name];
       options.parse = false;
-      this._request(options);
+      return this._request(options);
     }
+    return false;
   }
 }
 

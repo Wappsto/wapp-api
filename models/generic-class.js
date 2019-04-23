@@ -267,6 +267,9 @@ class Generic extends EventEmitter {
 
 
     fetch(options = {}) {
+        if(!this.get("meta.id")){
+          return false;
+        }
         options.method = "GET";
         return this._request(options);
     }
@@ -292,7 +295,7 @@ class Generic extends EventEmitter {
 
     destroy(options = {}) {
         if(!this.get("meta.id")){
-          return;
+          return false;
         }
         let success = options.success;
         options.success = (jsonResponse) => {

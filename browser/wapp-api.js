@@ -301,6 +301,9 @@ class Generic extends EventEmitter {
 
 
     fetch(options = {}) {
+        if(!this.get("meta.id")){
+          return false;
+        }
         options.method = "GET";
         return this._request(options);
     }
@@ -326,7 +329,7 @@ class Generic extends EventEmitter {
 
     destroy(options = {}) {
         if(!this.get("meta.id")){
-          return;
+          return false;
         }
         let success = options.success;
         options.success = (jsonResponse) => {
@@ -973,8 +976,9 @@ class State extends Generic{
       options.method = "GET";
       options.url = this.util.baseUrl + "/log/" + this.get("meta.id") + "?type=" + this[_name];
       options.parse = false;
-      this._request(options);
+      return this._request(options);
     }
+    return false;
   }
 }
 
@@ -3224,7 +3228,7 @@ class Wappsto {
       let requestOptions = Object.assign({}, options, {
         url: this.util.baseUrl + "/" + searchIn + "?" + data
       });
-      collection.fetch(requestOptions);
+      return collection.fetch(requestOptions);
   }
 
   _getOptionsData(searchObj, options) {

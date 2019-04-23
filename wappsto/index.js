@@ -85,7 +85,7 @@ class Wappsto {
       let requestOptions = Object.assign({}, options, {
         url: this.util.baseUrl + "/" + searchIn + "?" + data
       });
-      collection.fetch(requestOptions);
+      return collection.fetch(requestOptions);
   }
 
   _getOptionsData(searchObj, options) {
