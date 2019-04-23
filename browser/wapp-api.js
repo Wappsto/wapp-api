@@ -325,6 +325,9 @@ class Generic extends EventEmitter {
     }
 
     destroy(options = {}) {
+        if(!this.get("meta.id")){
+          return;
+        }
         let success = options.success;
         options.success = (jsonResponse) => {
             if(success){
