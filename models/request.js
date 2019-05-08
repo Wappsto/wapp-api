@@ -30,7 +30,7 @@ class Request {
       }
     }
     let headers = options["headers"] || {}
-    if (this.util.session && !headers["x-session"]) {
+    if (options.useSession !== false && this.util.session && !headers["x-session"]) {
       headers["x-session"] = this.util.session;
     }
     headers["Content-Type"] = "application/json";

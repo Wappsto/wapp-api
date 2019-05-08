@@ -45,18 +45,26 @@ class Wappsto {
   }
 
   send(options){
+    options = Object.assign({}, options);
+    options.url = this.util.baseUrl + options.url;
     return this[_requestInstance].http(options);
   }
 
   sendExtsync(options){
     if(options.generateUrl !== false){
-      let url = this.util.baseUrl + '/extsync/';
+      options = Object.assign({}, options);
+      let url = this.util.baseUrl + '/extsync';
       if(options.request === true){
-        url += 'request/';
+        url += '/request';
       } else if(options.respones === true){
-        url += 'response/';
+        url += '/response';
       }
-      url += (options.token || this.util.token) + options.url;
+      if(options.useSession === false || options.token){
+        url += '/' + (options.token || this.util.token);
+      }
+      if(options.url){
+        url += options.url;
+      }
       options.url = url;
     }
     return this[_requestInstance].http(options);
