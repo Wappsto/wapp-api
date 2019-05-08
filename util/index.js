@@ -51,7 +51,7 @@ module.exports = {
         } catch (err) {}
         return false;
     },
-    extend: function(util) {
+    extend: function(util = {}) {
       let xSession = util.session || session;
       if (!xSession) {
         throw new Error("session is required");
