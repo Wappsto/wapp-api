@@ -304,45 +304,47 @@ class Generic extends EventEmitter {
         if(!this.get("meta.id")){
           return false;
         }
-        options.method = "GET";
-        return this._request(options);
+        let requestOptions = Object.assign({}, options);
+        requestOptions.method = "GET";
+        return this._request(requestOptions);
     }
 
     save(data, options = {}) {
-        if (options.patch == true) {
-            options.method = "PATCH";
-            options.data = JSON.stringify(data);
+        let requestOptions = Object.assign({}, options);
+        if (requestOptions.patch == true) {
+            requestOptions.method = "PATCH";
+            requestOptions.data = JSON.stringify(data);
         } else {
             if (this.get("meta.id")) {
-                options.method = "PUT";
+                requestOptions.method = "PUT";
             } else {
-                options.method = "POST";
-                options.create = true;
+                requestOptions.method = "POST";
+                requestOptions.create = true;
             }
-            if(options.merge !== false){
-              data = Object.assign({}, this.toJSON(options), data);
+            if(requestOptions.merge !== false){
+              data = Object.assign({}, this.toJSON(requestOptions), data);
             }
-            options.data = JSON.stringify(data);
+            requestOptions.data = JSON.stringify(data);
         }
-        return this._request(options);
+        return this._request(requestOptions);
     }
 
     destroy(options = {}) {
         if(!this.get("meta.id")){
           return false;
         }
-        let success = options.success;
-        options.success = (jsonResponse) => {
+        let requestOptions = Object.assign({}, options);
+        requestOptions.success = (self, jsonResponse, response) => {
             if(success){
-              success.call(this, this, jsonResponse);
+              success.call(this, this, jsonResponse, response);
             }
             this[_collections].forEach((col) => {
                 col.remove(this);
             });
             this.emit("destroy", this);
         }
-        options.method = "DELETE";
-        return this._request(options);
+        requestOptions.method = "DELETE";
+        return this._request(requestOptions);
     }
 
     parent() {
@@ -864,7 +866,7 @@ class Request {
       }
     }
     let headers = options["headers"] || {}
-    if (this.util.session && !headers["x-session"]) {
+    if (options.useSession !== false && this.util.session && !headers["x-session"]) {
       headers["x-session"] = this.util.session;
     }
     headers["Content-Type"] = "application/json";
@@ -11130,26 +11132,42 @@ module.exports = tracer;
 
 },{"http":66,"https":44}],80:[function(require,module,exports){
 (function (process){
-let baseUrl, session;
+let baseUrl, session, token;
+
+let readCookie = function(name){
+  var nameEQ = name + '=';
+  var ca = window.document.cookie.split(';');
+  for (var i = 0; i < ca.length; i++) {
+      var c = ca[i];
+      while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+let get = function(key){
+  let result = window.sessionStorage.getItem(key);
+  if(!result){
+    result = readCookie(key);
+  }
+  return result;
+}
+
 if(typeof window === 'object' && window.document){
     baseUrl = "/services";
-    session = window.sessionStorage.getItem("sessionID");
-    if(!session){
-      let readCookie = function(name){
-        var nameEQ = name + '=';
-        var ca = window.document.cookie.split(';');
-        for (var i = 0; i < ca.length; i++) {
-            var c = ca[i];
-            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-        }
-        return null;
-      }
-      session = readCookie("sessionID");
-    }
+    session = get("sessionID");
+    token = get("tokenID");
 } else {
     baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
     session = process.env.sessionID;
+    token = process.env.tokenID;
+}
+
+function define(obj, prop, value){
+  Object.defineProperty(obj, prop, {
+    value: value,
+    writable: false
+  });
 }
 
 module.exports = {
@@ -11167,21 +11185,17 @@ module.exports = {
         } catch (err) {}
         return false;
     },
-    extend: function(util) {
-        let newUtil = Object.assign({}, util);
-        if (!newUtil.session) {
-            if(!session){
-                throw new Error("session is required");
-            }
-            newUtil.session = session;
-        }
-        if (!newUtil.version) {
-            newUtil.version = this.version;
-        }
-        if (!newUtil.baseUrl) {
-            newUtil.baseUrl = this.baseUrl;
-        }
-        return newUtil;
+    extend: function(util = {}) {
+      let xSession = util.session || session;
+      if (!xSession) {
+        throw new Error("session is required");
+      }
+      let newUtil = {};
+      define(newUtil, "session", xSession);
+      define(newUtil, "version", util.version || this.version);
+      define(newUtil, "baseUrl", util.baseUrl || this.baseUrl);
+      define(newUtil, "token", util.token || token);
+      return newUtil;
     },
     throw: function(response){
       process.on('unhandledRejection', up => { throw up });
@@ -11235,6 +11249,32 @@ class Wappsto {
 
   set wStream(wStream){
     this[_requestInstance]._wStream = wStream;
+  }
+
+  send(options){
+    options = Object.assign({}, options);
+    options.url = this.util.baseUrl + options.url;
+    return this[_requestInstance].http(options);
+  }
+
+  sendExtsync(options){
+    if(options.generateUrl !== false){
+      options = Object.assign({}, options);
+      let url = this.util.baseUrl + '/extsync';
+      if(options.request === true){
+        url += '/request';
+      } else if(options.respones === true){
+        url += '/response';
+      }
+      if(options.useSession === false || options.token){
+        url += '/' + (options.token || this.util.token);
+      }
+      if(options.url){
+        url += options.url;
+      }
+      options.url = url;
+    }
+    return this[_requestInstance].http(options);
   }
 
   create(type, obj = {}, options){
@@ -11450,6 +11490,10 @@ class WappstoRequest extends Request {
     super(util);
     this._wappsto = wappsto;
     this._waitFor = {};
+  }
+
+  http(options){
+    return super.send({url: () => undefined}, options);
   }
 
   send(context, options){
