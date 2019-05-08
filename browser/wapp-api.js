@@ -10635,7 +10635,14 @@ class WappstoStream extends EventEmitter {
             }
             self.emit('message', e);
             message.forEach((msg) => {
-                if(msg.meta_object.type === 'extsync' && msg.extsync.uri === 'extsync/wappsto/editor/console'){
+                if(msg.meta_object.type === 'extsync'){
+                    if(msg.extsync.uri !== 'extsync/wappsto/editor/console'){
+                        self.emit('extsync', msg);
+                    }
+                    return;
+                }
+                if(msg.meta_object.type === 'extsync_request'){
+                    self.emit('extsync_request', msg);
                     return;
                 }
                 let traceId = self._checkAndSendTrace(msg);
