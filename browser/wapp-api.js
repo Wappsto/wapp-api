@@ -10637,12 +10637,12 @@ class WappstoStream extends EventEmitter {
             message.forEach((msg) => {
                 if(msg.meta_object.type === 'extsync'){
                     if(msg.extsync.uri !== 'extsync/wappsto/editor/console'){
-                        self.emit('extsync', msg);
+                        self.emit('extsync', msg.extsync);
                     }
                     return;
                 }
                 if(msg.meta_object.type === 'extsync_request'){
-                    self.emit('extsync_request', msg);
+                    self.emit('extsync_request', msg.extsync_request);
                     return;
                 }
                 let traceId = self._checkAndSendTrace(msg);
@@ -11268,10 +11268,13 @@ class Wappsto {
     if(options.generateUrl !== false){
       options = Object.assign({}, options);
       let url = this.util.baseUrl + '/extsync';
-      if(options.request === true){
+      if(options.type === "request"){
         url += '/request';
-      } else if(options.respones === true){
+      } else if(options.type === "response"){
         url += '/response';
+        if(!options.method){
+          options.method = "PATCH";
+        }
       }
       if(options.useSession === false || options.token){
         url += '/' + (options.token || this.util.token);

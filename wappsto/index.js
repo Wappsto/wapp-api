@@ -54,10 +54,13 @@ class Wappsto {
     if(options.generateUrl !== false){
       options = Object.assign({}, options);
       let url = this.util.baseUrl + '/extsync';
-      if(options.request === true){
+      if(options.type === "request"){
         url += '/request';
-      } else if(options.respones === true){
+      } else if(options.type === "response"){
         url += '/response';
+        if(!options.method){
+          options.method = "PATCH";
+        }
       }
       if(options.useSession === false || options.token){
         url += '/' + (options.token || this.util.token);
