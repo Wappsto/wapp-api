@@ -270,45 +270,47 @@ class Generic extends EventEmitter {
         if(!this.get("meta.id")){
           return false;
         }
-        options.method = "GET";
-        return this._request(options);
+        let requestOptions = Object.assign({}, options);
+        requestOptions.method = "GET";
+        return this._request(requestOptions);
     }
 
     save(data, options = {}) {
-        if (options.patch == true) {
-            options.method = "PATCH";
-            options.data = JSON.stringify(data);
+        let requestOptions = Object.assign({}, options);
+        if (requestOptions.patch == true) {
+            requestOptions.method = "PATCH";
+            requestOptions.data = JSON.stringify(data);
         } else {
             if (this.get("meta.id")) {
-                options.method = "PUT";
+                requestOptions.method = "PUT";
             } else {
-                options.method = "POST";
-                options.create = true;
+                requestOptions.method = "POST";
+                requestOptions.create = true;
             }
-            if(options.merge !== false){
-              data = Object.assign({}, this.toJSON(options), data);
+            if(requestOptions.merge !== false){
+              data = Object.assign({}, this.toJSON(requestOptions), data);
             }
-            options.data = JSON.stringify(data);
+            requestOptions.data = JSON.stringify(data);
         }
-        return this._request(options);
+        return this._request(requestOptions);
     }
 
     destroy(options = {}) {
         if(!this.get("meta.id")){
           return false;
         }
-        let success = options.success;
-        options.success = (jsonResponse) => {
+        let requestOptions = Object.assign({}, options);
+        requestOptions.success = (self, jsonResponse, response) => {
             if(success){
-              success.call(this, this, jsonResponse);
+              success.call(this, this, jsonResponse, response);
             }
             this[_collections].forEach((col) => {
                 col.remove(this);
             });
             this.emit("destroy", this);
         }
-        options.method = "DELETE";
-        return this._request(options);
+        requestOptions.method = "DELETE";
+        return this._request(requestOptions);
     }
 
     parent() {

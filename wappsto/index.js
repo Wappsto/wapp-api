@@ -44,6 +44,24 @@ class Wappsto {
     this[_requestInstance]._wStream = wStream;
   }
 
+  send(options){
+    return this[_requestInstance].http(options);
+  }
+
+  sendExtsync(options){
+    if(options.generateUrl !== false){
+      let url = this.util.baseUrl + '/extsync/';
+      if(options.request === true){
+        url += 'request/';
+      } else if(options.respones === true){
+        url += 'response/';
+      }
+      url += (options.token || this.util.token) + options.url;
+      options.url = url;
+    }
+    return this[_requestInstance].http(options);
+  }
+
   create(type, obj = {}, options){
       if(!type || !this.models[type]){
           console.error("you must specify a model type");

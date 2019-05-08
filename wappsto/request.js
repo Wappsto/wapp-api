@@ -24,6 +24,10 @@ class WappstoRequest extends Request {
     this._waitFor = {};
   }
 
+  http(options){
+    return super.send({url: () => undefined}, options);
+  }
+
   send(context, options){
     if(context instanceof StreamModel || (context[_class] && context[_class].prototype instanceof StreamModel) || context[_className] === "stream"){
       return super.send.apply(this, arguments);

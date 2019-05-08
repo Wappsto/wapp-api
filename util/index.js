@@ -1,23 +1,39 @@
-let baseUrl, session;
+let baseUrl, session, token;
+
+let readCookie = function(name){
+  var nameEQ = name + '=';
+  var ca = window.document.cookie.split(';');
+  for (var i = 0; i < ca.length; i++) {
+      var c = ca[i];
+      while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+      if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+let get = function(key){
+  let result = window.sessionStorage.getItem(key);
+  if(!result){
+    result = readCookie(key);
+  }
+  return result;
+}
+
 if(typeof window === 'object' && window.document){
     baseUrl = "/services";
-    session = window.sessionStorage.getItem("sessionID");
-    if(!session){
-      let readCookie = function(name){
-        var nameEQ = name + '=';
-        var ca = window.document.cookie.split(';');
-        for (var i = 0; i < ca.length; i++) {
-            var c = ca[i];
-            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-        }
-        return null;
-      }
-      session = readCookie("sessionID");
-    }
+    session = get("sessionID");
+    token = get("tokenID");
 } else {
     baseUrl = process.env.baseUrl && process.env.baseUrl.slice(0, -1);
     session = process.env.sessionID;
+    token = process.env.tokenID;
+}
+
+function define(obj, prop, value){
+  Object.defineProperty(obj, prop, {
+    value: value,
+    writable: false
+  });
 }
 
 module.exports = {
@@ -36,20 +52,16 @@ module.exports = {
         return false;
     },
     extend: function(util) {
-        let newUtil = Object.assign({}, util);
-        if (!newUtil.session) {
-            if(!session){
-                throw new Error("session is required");
-            }
-            newUtil.session = session;
-        }
-        if (!newUtil.version) {
-            newUtil.version = this.version;
-        }
-        if (!newUtil.baseUrl) {
-            newUtil.baseUrl = this.baseUrl;
-        }
-        return newUtil;
+      let xSession = util.session || session;
+      if (!xSession) {
+        throw new Error("session is required");
+      }
+      let newUtil = {};
+      define(newUtil, "session", xSession);
+      define(newUtil, "version", util.version || this.version);
+      define(newUtil, "baseUrl", util.baseUrl || this.baseUrl);
+      define(newUtil, "token", util.token || token);
+      return newUtil;
     },
     throw: function(response){
       process.on('unhandledRejection', up => { throw up });
