@@ -11,9 +11,9 @@ const STATUS = {
   WAITING: "waiting"    // waiting for user to accept
 }
 
-let callStatusChange = function(options, status){
+let callStatusChange = function(options, status, context, response){
   if(options.onStatusChange && (!options.onlySuccess || status === STATUS.ACCEPTED)){
-    options.onStatusChange.call(this, status);
+    options.onStatusChange.call(this, status, context, response);
   }
 };
 
@@ -25,7 +25,7 @@ class WappstoRequest extends Request {
   }
 
   http(options){
-    return super.send({url: () => undefined}, options);
+    return super.send({ url: () => undefined }, options);
   }
 
   send(context, options){
@@ -93,23 +93,26 @@ class WappstoRequest extends Request {
         callStatusChange.call(context, options, STATUS.WAITING);
         this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
       } else {
-        callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
-        context.on("response:handled", () => {
-          if(options.subscribe === true && this._wStream){
-            this._wStream.subscribe(context);
-          }
-        });
-        resolve(response);
+        this._callSuccess(context, response, options);
       }
     } else {
-        callStatusChange.call(context, options, STATUS.ACCEPTED);
-        context.on("response:handled", () => {
-          if(options.subscribe === true && this._wStream){
-            this._wStream.subscribe(context);
+        this._callSuccess(context, response, options);
+    }
+  }
+
+  _callSuccess(context, response, options){
+    callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
+    let handled = () => {
+      context.off("response:handled", handled);
+      if(options.subscribe === true && this._wStream){
+        this._wStream.subscribe(context, {
+          success: () => {
+            resolve(response);
           }
         });
-        resolve(response);
-    }
+      }
+    };
+    context.on("response:handled", handled);
   }
 
   _handleError(context, options, response, resolve, reject){

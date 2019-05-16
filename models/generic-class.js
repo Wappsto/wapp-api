@@ -265,7 +265,6 @@ class Generic extends EventEmitter {
       }
     }
 
-
     fetch(options = {}) {
         if(!this.get("meta.id")){
           return false;
