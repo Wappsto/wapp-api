@@ -13,11 +13,11 @@ let tracer = {
             if (this.params && this.params.name) {
                 name = this.params.name;
             } else {
-                name = 'WS_APP_' + isBrowser ? 'FOREGROUND' : 'BACKGROUND';
+                name = "WS_APP_BACKGROUND";
             }
         }
         if (id === null) {
-            id = name + '_' + Math.floor(Math.random() * 1000000 + 1);
+            id = 'WS_APP_BACKGROUND_' + Math.floor(Math.random() * 1000000 + 1);
         }
         var str = '';
         for (let k in data) {
@@ -63,15 +63,14 @@ if(typeof window === 'object' && window.document && window.fetch){
         return setRequestHeader.apply(this, arguments);
       }
       XMLHttpRequest.prototype.send = function() {
-        let nodeId;
         if(this.trace.shouldTrace){
-          nodeId = tracer.sendTrace(this.trace.session, this.trace.parentNode, this.trace.nodeId, this.trace.nodeName, this.trace.query && { query: this.trace.query }, 'ok');
+          tracer.sendTrace(this.trace.session, this.trace.parentNode, this.trace.nodeId, this.trace.nodeName, { query: this.trace.query }, 'ok');
         }
         // Handle response that have TRACE in data
         this.addEventListener(
             'load',
             function() {
-              checkResponseTrace(this.status, this.response, nodeId, this.trace.nodeName, this.trace.session);
+              checkResponseTrace(this.status, this.response, nodeId, nodeName);
             },
             false
         );
@@ -179,7 +178,7 @@ const checkAndSendTrace = function(method, path, session) {
     if(tracer.params && tracer.params.name){
         nodeName = tracer.params.name + "_" + method + '_' + path;
     } else {
-        nodeName = 'WS_APP_' + isBrowser ? 'FOREGROUND' : 'BACKGROUND' + method + '_' + path;
+        nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
     }
     if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
         // Removing trace_parent from path
@@ -225,19 +224,21 @@ const checkAndSendTrace = function(method, path, session) {
 
 const checkResponseTrace = function(status, response, nodeId, nodeName, session){
   // Handle response that have TRACE in data
-  let responseTrace;
-  try {
-      let jsonResponse = JSON.parse(response);
-      responseTrace = jsonResponse.meta.trace || nodeId;
-  } catch (e) {
-      responseTrace = nodeId;
-  }
-  if (responseTrace) {
-      if (status === 200) {
-          tracer.sendTrace(session, responseTrace, null, nodeName, null, 'ok');
-      } else {
-          tracer.sendTrace(session, responseTrace, null, nodeName, null, 'fail');
-      }
+  if(status === 200){
+    if(nodeId){
+      tracer.sendTrace(session, nodeId, null, nodeName, null, 'ok');
+    }
+  } else {
+    let responseTrace;
+    try {
+        let jsonResponse = JSON.parse(response);
+        responseTrace = jsonResponse.trace;
+    } catch (e) {
+        responseTrace = nodeId;
+    }
+    if(responseTrace){
+      tracer.sendTrace(session, responseTrace, null, nodeName, null, 'fail');
+    }
   }
 }
 

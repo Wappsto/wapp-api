@@ -93,26 +93,30 @@ class WappstoRequest extends Request {
         callStatusChange.call(context, options, STATUS.WAITING);
         this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
       } else {
-        this._callSuccess(context, response, options);
+        this._callSuccess(context, response, options, resolve);
       }
     } else {
-        this._callSuccess(context, response, options);
+        this._callSuccess(context, response, options, resolve);
     }
   }
 
-  _callSuccess(context, response, options){
+  _callSuccess(context, response, options, resolve){
     callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
     let handled = () => {
-      context.off("response:handled", handled);
+      context.removeListener("response:handled", handled);
+      options.parse = false;
       if(options.subscribe === true && this._wStream){
         this._wStream.subscribe(context, {
           success: () => {
             resolve(response);
           }
         });
+      } else {
+        resolve(response);
       }
     };
     context.on("response:handled", handled);
+    context.emit("handle:response", response, options);
   }
 
   _handleError(context, options, response, resolve, reject){

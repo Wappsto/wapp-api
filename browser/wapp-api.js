@@ -92,6 +92,7 @@ class Generic extends EventEmitter {
             this.on("destroy", this._propagateEventDown);
         }
 
+        this._addResponseHandler();
     }
 
     _propagateEventDown(){
@@ -262,18 +263,28 @@ class Generic extends EventEmitter {
         return json;
     }
 
+    _addResponseHandler(){
+      this.on("handle:response", (response, options) => {
+        this._parseData(response, options);
+        this.emit("response:handled", this, response.data, response);
+      });
+    }
+
+    _parseData(response, options){
+      if (options.parse !== false) {
+        let data = this.parse(response.data);
+        this.set(data, options);
+      }
+    }
+
     _request(options){
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
       .then((response) => {
         responseFired = true;
-        if (options.parse !== false) {
-          let data = this.parse(response.data);
-          this.set(data, options);
-        }
+        this._parseData(response, options);
         response.responseJSON = response.data;
-        this.emit("response:handled", this, response.data, response);
         this._fireResponse("success", this, [this, response.data, response], options);
         return this;
       })
@@ -417,6 +428,7 @@ class Collection extends EventEmitter {
         }
 
         this._onModelDestroy = this._onModelDestroy.bind(this);
+        this._addResponseHandler();
     }
 
     _propagateEventDown(event){
@@ -636,16 +648,28 @@ class Collection extends EventEmitter {
         return data;
     }
 
+    _addResponseHandler(){
+      this.on("handle:response", (response, options) => {
+        this._parseData(response, options);
+        this.emit("response:handled", this, response.data, response);
+      });
+    }
+
+    _parseData(response, options){
+      if (options.parse !== false) {
+        let data = this.parse(response.data);
+        this.add(data);
+      }
+    }
+
     _request(options){
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
         .then((response) => {
           responseFired = true;
-          let data = this.parse(response.data);
-          this.add(data);
+          this._parseData(response, options);
           response.responseJSON = response.data;
-          this.emit("response:handled", this, response.data, response);
           this._fireResponse("success", this, [this, response.data, response], options);
           return this;
         })
@@ -2932,11 +2956,11 @@ let tracer = {
             if (this.params && this.params.name) {
                 name = this.params.name;
             } else {
-                name = "WS_APP_BACKGROUND";
+                name = 'WS_APP_' + isBrowser ? 'FOREGROUND' : 'BACKGROUND';
             }
         }
         if (id === null) {
-            id = 'WS_APP_BACKGROUND_' + Math.floor(Math.random() * 1000000 + 1);
+            id = name + '_' + Math.floor(Math.random() * 1000000 + 1);
         }
         var str = '';
         for (let k in data) {
@@ -2962,15 +2986,47 @@ let tracer = {
 }
 
 if(typeof window === 'object' && window.document && window.fetch){
-  const originalFetch = window.fetch;
-  window.fetch = function(req, options){
-    checkAndSendTrace(req, options);
-    return originalFetch.apply(this, arguments);
-  }
+  (function(open, setRequestHeader, send) {
+      XMLHttpRequest.prototype.open = function(method, url){
+        let trace = checkAndSendTrace(method, url);
+        if(trace.shouldTrace){
+          trace.method = method;
+          if(trace.query){
+            url = url.split('?')[0] + trace.query;
+          }
+        }
+        trace.url = url;
+        this.trace = trace;
+        return open.apply(this, arguments);
+      }
+      XMLHttpRequest.prototype.setRequestHeader = function(key, value){
+        if(this.trace.shouldTrace && key === 'x-session'){
+          this.trace.session = value;
+        }
+        return setRequestHeader.apply(this, arguments);
+      }
+      XMLHttpRequest.prototype.send = function() {
+        let nodeId;
+        if(this.trace.shouldTrace){
+          nodeId = tracer.sendTrace(this.trace.session, this.trace.parentNode, this.trace.nodeId, this.trace.nodeName, this.trace.query && { query: this.trace.query }, 'pending');
+        }
+        // Handle response that have TRACE in data
+        this.addEventListener(
+            'load',
+            function() {
+              checkResponseTrace(this.status, this.response, nodeId, this.trace.nodeName, this.trace.session);
+            },
+            false
+        );
+        return send.apply(this, arguments);
+      };
+  })(XMLHttpRequest.prototype.open, XMLHttpRequest.prototype.setRequestHeader, XMLHttpRequest.prototype.send);
   window.Tracer = tracer;
-  fetch = originalFetch;
+  fetch = window.fetch;
   through = "/external/";
   isBrowser = true;
+
+  // Check Global Trace
   let search = window.location.search;
   let traceIndex = search.indexOf("trace");
   if(traceIndex !== -1){
@@ -2996,14 +3052,51 @@ if(typeof window === 'object' && window.document && window.fetch){
       }
   };
 
+  const handleRequestEnd = function(request, nodeId, nodeName){
+    request.on('response', function (response) {
+      let body = '';
+      response.on('data', function (chunk) {
+        body += chunk;
+      });
+      response.on('end', function () {
+        console.log(response);
+        checkResponseTrace(status, body, nodeId, nodeName);
+      });
+    });
+  };
+
+  const func = function(req = {}, options = {}, defaultFunc) {
+      let url, method, session, isObject;
+      if (req.constructor === String) {
+          isObject = false;
+          url = req;
+          method = options.method || 'GET';
+          session = options.headers && options.headers["x-session"];
+      } else if(Object.prototype.toString.call(req) === "[object Object]"){
+          isObject = true;
+          url = req.path;
+          method = req.method || 'GET';
+          session = req.headers && req.headers["x-session"];
+      }
+      let { nodeId, nodeName, newQuery } = checkAndSendTrace(method, url, session);
+      if(newQuery){
+        if(isObject){
+          req.path = req.path.split('?')[0] + newQuery;
+        } else {
+          req = req.split('?')[0] + newQuery;
+        }
+      }
+      let request = defaultFunc.apply(this, arguments);
+      handleRequestEnd(request, nodeId, nodeName);
+      return request;
+  }
+
   const overrideRequest = function(protocol, strName) {
-      protocol.request = function(req, options) {
-          checkAndSendTrace(req, options);
-          return originalRequest[strName].request.apply(this, arguments);
+      protocol.request = function(req, options){
+        return func(req, options, originalRequest[strName].request);
       }
       protocol.get = function(req, options) {
-          checkAndSendTrace(req, options);
-          return originalRequest[strName].get.apply(this, arguments);
+        return func(req, options, originalRequest[strName].get);
       }
   };
 
@@ -3015,36 +3108,27 @@ if(typeof window === 'object' && window.document && window.fetch){
   isBrowser = false;
 }
 
-const checkAndSendTrace = function(req = {}, options = {}) {
-    let path, method, nodeName;
-    if (req.constructor === String) {
-        path = req.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
-        if(path.indexOf('/') !== -1){
-            path = path.split('/').slice(1).join('/') || '';
-        } else {
-            path = path.split('?')[1] || '';
-        }
-        method = options.method || 'GET';
-        session = options.headers && options.headers["x-session"];
-    } else if(Object.prototype.toString.call(req) === "[object Object]"){
-        path = req.path;
-        method = req.method || 'GET';
-        options = req;
-        session = req.headers && req.headers["x-session"];
-    }
-    if(!path || !session){
+const checkAndSendTrace = function(method, path, session) {
+    if(!path){
       return;
+    }
+    let nodeId, nodeName, parentNode, newQuery, shouldTrace = false;
+    path = path.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
+    if(path.indexOf('/') !== -1){
+        path = path.split('/').slice(1).join('/') || '';
+    } else {
+        path = path.split('?')[1] || '';
     }
     if(tracer.params && tracer.params.name){
         nodeName = tracer.params.name + "_" + method + '_' + path;
     } else {
-        nodeName = 'WS_APP_BACKGROUND_' + method + '_' + path;
+        nodeName = 'WS_APP_' + isBrowser ? 'FOREGROUND' : 'BACKGROUND' + method + '_' + path;
     }
     if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
         // Removing trace_parent from path
-        var splitPath = path.split('?');
-        var queryData = {};
-        var tracing = false;
+        let splitPath = path.split('?');
+        let queryData = {};
+        let tracing = false;
         if (splitPath.length > 1) {
             // Converting query to object
             var query = splitPath[1].split('&');
@@ -3054,12 +3138,12 @@ const checkAndSendTrace = function(req = {}, options = {}) {
                 queryData[q[0]] = q[1];
             });
 
-            var parentNode = queryData['trace_parent'];
+            parentNode = queryData['trace_parent'];
             nodeId = queryData['trace'];
             if (nodeId) {
                 // Clean and reconstruct
                 delete queryData['trace_parent'];
-                var newQuery = '';
+                newQuery = '';
                 for(let key in queryData){
                     newQuery += key + '=' + queryData[key] + '&';
                 }
@@ -3070,19 +3154,35 @@ const checkAndSendTrace = function(req = {}, options = {}) {
 
                 path = origin + newQuery;
                 var splitOrigin = origin.split('/');
-                tracer.sendTrace(session, parentNode, nodeId, nodeName, { query: queryData }, 'ok');
+                shouldTrace = true;
                 tracing = true;
             }
         }
 
         if (!tracing && tracer.globalTrace === true && session && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
-            var id = tracer.sendTrace(session, parentNode, null, nodeName, { method, path }, 'ok');
-            path += '?trace=' + id;
+            shouldTrace = true;
         }
-
-        options.path = path;
+        return { nodeId, nodeName, parentNode, quary: newQuery, shouldTrace };
     }
 };
+
+const checkResponseTrace = function(status, response, nodeId, nodeName, session){
+  // Handle response that have TRACE in data
+  var responseTrace;
+  try {
+      var jsonResponse = JSON.parse(response);
+      responseTrace = jsonResponse.meta.trace || nodeId;
+  } catch (e) {
+      responseTrace = nodeId;
+  }
+  if (responseTrace) {
+      if (status === 200) {
+          tracer.sendTrace(session, null, nodeId, nodeName, null, 'ok');
+      } else {
+          tracer.sendTrace(session, null, nodeId, nodeName, null, 'fail');
+      }
+  }
+}
 
 module.exports = tracer;
 
@@ -3565,26 +3665,30 @@ class WappstoRequest extends Request {
         callStatusChange.call(context, options, STATUS.WAITING);
         this._waitFor[searchIn] = [...(this._waitFor[searchIn] || []), { context: context, options: options, resolve: resolve, reject: reject }];
       } else {
-        this._callSuccess(context, response, options);
+        this._callSuccess(context, response, options, resolve);
       }
     } else {
-        this._callSuccess(context, response, options);
+        this._callSuccess(context, response, options, resolve);
     }
   }
 
-  _callSuccess(context, response, options){
+  _callSuccess(context, response, options, resolve){
     callStatusChange.call(context, options, STATUS.ACCEPTED, context, response);
     let handled = () => {
-      context.off("response:handled", handled);
+      context.removeListener("response:handled", handled);
+      options.parse = false;
       if(options.subscribe === true && this._wStream){
         this._wStream.subscribe(context, {
           success: () => {
             resolve(response);
           }
         });
+      } else {
+        resolve(response);
       }
     };
     context.on("response:handled", handled);
+    context.emit("handle:response", response, options);
   }
 
   _handleError(context, options, response, resolve, reject){
