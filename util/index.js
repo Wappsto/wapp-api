@@ -32,7 +32,8 @@ if(typeof window === 'object' && window.document){
 function define(obj, prop, value){
   Object.defineProperty(obj, prop, {
     value: value,
-    writable: false
+    writable: false,
+    enumerable: true
   });
 }
 
