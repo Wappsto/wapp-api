@@ -3006,15 +3006,14 @@ if(typeof window === 'object' && window.document && window.fetch){
         return setRequestHeader.apply(this, arguments);
       }
       XMLHttpRequest.prototype.send = function() {
-        let nodeId;
         if(this.trace.shouldTrace){
-          nodeId = tracer.sendTrace(this.trace.session, this.trace.parentNode, this.trace.nodeId, this.trace.nodeName, this.trace.query && { query: this.trace.query }, 'pending');
+          tracer.sendTrace(this.trace.session, this.trace.parentNode, this.trace.nodeId, this.trace.nodeName, this.trace.query && { query: this.trace.query }, 'ok');
         }
         // Handle response that have TRACE in data
         this.addEventListener(
             'load',
             function() {
-              checkResponseTrace(this.status, this.response, nodeId, this.trace.nodeName, this.trace.session);
+              checkResponseTrace(this.status, this.response, this.trace.nodeId, this.trace.nodeName, this.trace.session);
             },
             false
         );
@@ -3059,8 +3058,7 @@ if(typeof window === 'object' && window.document && window.fetch){
         body += chunk;
       });
       response.on('end', function () {
-        console.log(response);
-        checkResponseTrace(status, body, nodeId, nodeName);
+        checkResponseTrace(response.statusCode, body, nodeId, nodeName);
       });
     });
   };
@@ -3078,13 +3076,16 @@ if(typeof window === 'object' && window.document && window.fetch){
           method = req.method || 'GET';
           session = req.headers && req.headers["x-session"];
       }
-      let { nodeId, nodeName, newQuery } = checkAndSendTrace(method, url, session);
-      if(newQuery){
-        if(isObject){
-          req.path = req.path.split('?')[0] + newQuery;
-        } else {
-          req = req.split('?')[0] + newQuery;
+      let { nodeId, nodeName, parentNode, query, shouldTrace } = checkAndSendTrace(method, url);
+      if(shouldTrace){
+        if(query){
+          if(isObject){
+            req.path = req.path.split('?')[0] + query;
+          } else {
+            req = req.split('?')[0] + query;
+          }
         }
+        tracer.sendTrace(session, parentNode, nodeId, nodeName, query && { query: query }, 'ok');
       }
       let request = defaultFunc.apply(this, arguments);
       handleRequestEnd(request, nodeId, nodeName);
@@ -3108,7 +3109,7 @@ if(typeof window === 'object' && window.document && window.fetch){
   isBrowser = false;
 }
 
-const checkAndSendTrace = function(method, path, session) {
+const checkAndSendTrace = function(method, path) {
     if(!path){
       return;
     }
@@ -3159,27 +3160,27 @@ const checkAndSendTrace = function(method, path, session) {
             }
         }
 
-        if (!tracing && tracer.globalTrace === true && session && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
+        if (!tracing && tracer.globalTrace === true && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
             shouldTrace = true;
         }
-        return { nodeId, nodeName, parentNode, quary: newQuery, shouldTrace };
+        return { nodeId, nodeName, parentNode, query: newQuery, shouldTrace };
     }
 };
 
 const checkResponseTrace = function(status, response, nodeId, nodeName, session){
   // Handle response that have TRACE in data
-  var responseTrace;
+  let responseTrace;
   try {
-      var jsonResponse = JSON.parse(response);
+      let jsonResponse = JSON.parse(response);
       responseTrace = jsonResponse.meta.trace || nodeId;
   } catch (e) {
       responseTrace = nodeId;
   }
   if (responseTrace) {
       if (status === 200) {
-          tracer.sendTrace(session, null, nodeId, nodeName, null, 'ok');
+          tracer.sendTrace(session, responseTrace, null, nodeName, null, 'ok');
       } else {
-          tracer.sendTrace(session, null, nodeId, nodeName, null, 'fail');
+          tracer.sendTrace(session, responseTrace, null, nodeName, null, 'fail');
       }
   }
 }
@@ -3222,7 +3223,8 @@ if(typeof window === 'object' && window.document){
 function define(obj, prop, value){
   Object.defineProperty(obj, prop, {
     value: value,
-    writable: false
+    writable: false,
+    enumerable: true
   });
 }
 
@@ -3309,7 +3311,14 @@ class Wappsto {
 
   send(options){
     if(options.generateUrl !== false){
-      options = Object.assign({}, options);
+      if(options.constructor === Object){
+        options = Object.assign({}, options);
+      } else {
+        options = {
+          url: options,
+          method: "GET"
+        }
+      }
       options.url = this.util.baseUrl + options.url;
     }
     return this._sendAndHandle(options);
