@@ -46,7 +46,14 @@ class Wappsto {
 
   send(options){
     if(options.generateUrl !== false){
-      options = Object.assign({}, options);
+      if(options.constructor === Object){
+        options = Object.assign({}, options);
+      } else {
+        options = {
+          url: options,
+          method: "GET"
+        }
+      }
       options.url = this.util.baseUrl + options.url;
     }
     return this._sendAndHandle(options);
