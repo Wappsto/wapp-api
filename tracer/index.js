@@ -13,7 +13,7 @@ let tracer = {
             if (this.params && this.params.name) {
                 name = this.params.name;
             } else {
-                name = 'WS_APP_' + isBrowser ? 'FOREGROUND' : 'BACKGROUND';
+                name = 'WS_APP_' + (isBrowser ? 'FOREGROUND' : 'BACKGROUND');
             }
         }
         if (id === null) {
@@ -70,7 +70,7 @@ if(typeof window === 'object' && window.document && window.fetch){
         this.addEventListener(
             'load',
             function() {
-              checkResponseTrace(this.status, this.response, this.trace.nodeId, this.trace.nodeName, this.trace.session);
+              checkResponseTrace(this.status, this.response, this.trace.nodeId, this.trace.session);
             },
             false
         );
@@ -108,18 +108,6 @@ if(typeof window === 'object' && window.document && window.fetch){
       }
   };
 
-  const handleRequestEnd = function(request, nodeId, nodeName){
-    request.on('response', function (response) {
-      let body = '';
-      response.on('data', function (chunk) {
-        body += chunk;
-      });
-      response.on('end', function () {
-        checkResponseTrace(response.statusCode, body, nodeId, nodeName);
-      });
-    });
-  };
-
   const func = function(req = {}, options = {}, defaultFunc) {
       let url, method, session, isObject;
       if (req.constructor === String) {
@@ -145,7 +133,17 @@ if(typeof window === 'object' && window.document && window.fetch){
         tracer.sendTrace(session, parentNode, nodeId, nodeName, query && { query: query }, 'ok');
       }
       let request = defaultFunc.apply(this, arguments);
-      handleRequestEnd(request, nodeId, nodeName);
+
+      // Handling response
+      request.on('response', function (response) {
+        let body = '';
+        response.on('data', function (chunk) {
+          body += chunk;
+        });
+        response.on('end', function () {
+          checkResponseTrace(response.statusCode, body, nodeId);
+        });
+      });
       return request;
   }
 
@@ -168,7 +166,7 @@ if(typeof window === 'object' && window.document && window.fetch){
 
 const checkAndSendTrace = function(method, path) {
     if(!path){
-      return;
+      return {};
     }
     let nodeId, nodeName, parentNode, newQuery, shouldTrace = false;
     path = path.replace(/^http:\/\//, '').replace(/^https:\/\//, '');
@@ -180,7 +178,7 @@ const checkAndSendTrace = function(method, path) {
     if(tracer.params && tracer.params.name){
         nodeName = tracer.params.name + "_" + method + '_' + path;
     } else {
-        nodeName = 'WS_APP_' + isBrowser ? 'FOREGROUND' : 'BACKGROUND' + method + '_' + path;
+        nodeName = 'WS_APP_' + (isBrowser ? 'FOREGROUND_' : 'BACKGROUND_') + method + '_' + path;
     }
     if (path.startsWith('services/') || (path.startsWith('external/') && path.indexOf('external/tracer') === -1)) {
         // Removing trace_parent from path
@@ -220,24 +218,25 @@ const checkAndSendTrace = function(method, path) {
         if (!tracing && tracer.globalTrace === true && path && path.startsWith('services') && (path.indexOf('/network') !== -1 || path.indexOf('/device') !== -1 || path.indexOf('/value') !== -1 || path.indexOf('/state') !== -1)) {
             shouldTrace = true;
         }
-        return { nodeId, nodeName, parentNode, query: newQuery, shouldTrace };
     }
+    return { nodeId, nodeName, parentNode, query: newQuery, shouldTrace };
 };
 
-const checkResponseTrace = function(status, response, nodeId, nodeName, session){
+const checkResponseTrace = function(status, response, nodeId, session){
   // Handle response that have TRACE in data
-  let responseTrace;
-  try {
-      let jsonResponse = JSON.parse(response);
-      responseTrace = jsonResponse.meta.trace || nodeId;
-  } catch (e) {
-      responseTrace = nodeId;
+  let parent;
+  if(!nodeId){
+    try {
+        let jsonResponse = JSON.parse(response);
+        parent = jsonResponse.meta.trace;
+    } catch (e) {
+    }
   }
-  if (responseTrace) {
+  if (nodeId) {
       if (status === 200) {
-          tracer.sendTrace(session, responseTrace, null, nodeName, null, 'ok');
+          tracer.sendTrace(session, parent, nodeId, null, null, 'ok');
       } else {
-          tracer.sendTrace(session, responseTrace, null, nodeName, null, 'fail');
+          tracer.sendTrace(session, parent, nodeId, null, null, 'fail');
       }
   }
 }
