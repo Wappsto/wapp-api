@@ -146,7 +146,7 @@ It's optional to pass an object with the following keys to the constructor:
 * `token` (String): An installation token associated with [extsync](#extsync) requests.
 * `version` (String): Set a default version of documents.
 
-In `wapp.util` object you can access these options.
+In `wappsto.util` object you can access these options.
 
 It is possible to debug a **Background** task using browser's DevTools. All the wapp console logs will be shown in the DevTools Console:
 
