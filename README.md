@@ -133,7 +133,7 @@ for the **Foreground** task, add the following tag to the HTML page:
 
 ## Usage
 
-To use wapp-api, you need first an instance of `WappApi` class.
+To use wapp-api, you need first an instance of `Wappsto` class.
 ```javascript
 const Wappsto = require('wapp-api'); // If you're using NodeJS.
 
@@ -147,6 +147,19 @@ It's optional to pass an object with the following keys to the constructor:
 * `version` (String): Set a default version of documents.
 
 In `wapp.util` object you can access these options.
+
+It is possible to debug a **Background** task using browser's DevTools. All the wapp console logs will be shown in the DevTools Console:
+
+``` javascript
+const { start, end } = require('wapp-api/console');
+```
+
+> Remember to remove this piece of code before publishing your wapp.
+
+Exposed properties:
+* `start` (Function): start sending the logs.
+* `stop` (Function): stop sending the logs.
+
 
 ## Related
 
