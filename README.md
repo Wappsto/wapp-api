@@ -47,7 +47,7 @@ JSON example:
 ``` json
 {
   "name": "Smart Gateway D043",
-  "device": [...]
+  "device": []
 }
 ```
 
@@ -79,7 +79,7 @@ JSON example:
   "serial": "0123456",
   "description": "Smart sensor device that measures humidity and temperature every 15 minutes.",
   "communication": "Always Online",
-  "value": [...]
+  "value": []
 }
 ```
 
@@ -109,7 +109,7 @@ JSON example:
     "step": 1,
     "unit": "%"
   },
-  "state": [...]
+  "state": []
 }
 ```
 
@@ -135,12 +135,12 @@ for the **Foreground** task, add the following tag to the HTML page:
 
 To use wapp-api, you need first an instance of `WappApi` class.
 ```javascript
-const WappApi = require('wapp-api'); // If you're using NodeJS.
+const Wappsto = require('wapp-api'); // If you're using NodeJS.
 
-var wapp = new WappApi({...});
+var wapp = new Wappsto({...});
 ```
 
-It's optional to pass an object with options to the constructor:
+It's optional to pass an object with the following keys to the constructor:
 * `baseUrl` (String): prefix for the URL.
 * `session` (String): Set custom installation session.
 * `token` (String): An installation token associated with [extsync](#extsync) requests.
