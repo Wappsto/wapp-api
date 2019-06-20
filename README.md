@@ -137,7 +137,7 @@ To use wapp-api, you need first an instance of `WappApi` class.
 ```javascript
 const Wappsto = require('wapp-api'); // If you're using NodeJS.
 
-var wapp = new Wappsto({...});
+const wappsto = new Wappsto({...});
 ```
 
 It's optional to pass an object with the following keys to the constructor:
