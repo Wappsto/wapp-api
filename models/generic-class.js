@@ -58,6 +58,7 @@ class Generic extends EventEmitter {
             this.on("destroy", this._propagateEventDown);
         }
 
+        this._addResponseHandler();
     }
 
     _propagateEventDown(){
@@ -228,18 +229,28 @@ class Generic extends EventEmitter {
         return json;
     }
 
+    _addResponseHandler(){
+      this.on("handle:response", (response, options) => {
+        this._parseData(response, options);
+        this.emit("response:handled", this, response.data, response);
+      });
+    }
+
+    _parseData(response, options){
+      if (options.parse !== false) {
+        let data = this.parse(response.data);
+        this.set(data, options);
+      }
+    }
+
     _request(options){
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
       .then((response) => {
         responseFired = true;
-        if (options.parse !== false) {
-          let data = this.parse(response.data);
-          this.set(data, options);
-        }
+        this._parseData(response, options);
         response.responseJSON = response.data;
-        this.emit("response:handled", this, response.data, response);
         this._fireResponse("success", this, [this, response.data, response], options);
         return this;
       })
@@ -264,7 +275,6 @@ class Generic extends EventEmitter {
         options.complete.call(context, context);
       }
     }
-
 
     fetch(options = {}) {
         if(!this.get("meta.id")){

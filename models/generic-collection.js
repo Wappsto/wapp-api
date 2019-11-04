@@ -42,6 +42,7 @@ class Collection extends EventEmitter {
         }
 
         this._onModelDestroy = this._onModelDestroy.bind(this);
+        this._addResponseHandler();
     }
 
     _propagateEventDown(event){
@@ -261,16 +262,28 @@ class Collection extends EventEmitter {
         return data;
     }
 
+    _addResponseHandler(){
+      this.on("handle:response", (response, options) => {
+        this._parseData(response, options);
+        this.emit("response:handled", this, response.data, response);
+      });
+    }
+
+    _parseData(response, options){
+      if (options.parse !== false) {
+        let data = this.parse(response.data);
+        this.add(data);
+      }
+    }
+
     _request(options){
       let responseFired = false;
       options.xhr = true;
       return this[_requestInstance].send(this, options)
         .then((response) => {
           responseFired = true;
-          let data = this.parse(response.data);
-          this.add(data);
+          this._parseData(response, options);
           response.responseJSON = response.data;
-          this.emit("response:handled", this, response.data, response);
           this._fireResponse("success", this, [this, response.data, response], options);
           return this;
         })

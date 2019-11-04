@@ -15,6 +15,9 @@ class WappstoStream extends EventEmitter {
     constructor(stream) {
         super();
         this.models = {};
+        this.nextStream = false;
+        this.nextStreamPromises = [];
+        this.updating = false;
         this.close = this.close.bind(this);
         this._collectionAddCallback = this._collectionAddCallback.bind(this);
         this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
@@ -227,6 +230,11 @@ class WappstoStream extends EventEmitter {
         }
     }
 
+    _getUniqueSubscriptions(subscriptions){
+      let allSubscriptions = [...this.stream.get("subscription"), ...subscriptions];
+      return allSubscriptions.filter((value, index, self) => self.indexOf(value) === index);
+    }
+
     subscribe(arr, options = {}) {
         if (!this.stream) {
             console.error("stream model is not found, cannot update subscriptions");
@@ -247,6 +255,14 @@ class WappstoStream extends EventEmitter {
             }
         });
         if(subscriptions.length === 0) return;
+        subscriptions = this._getUniqueSubscriptions(subscriptions);
+        if(this.updating){
+          this.nextStream = subscriptions;
+          let promise = new Promise((resolve, reject) => {
+            this.nextStreamPromises.push({resolve, reject});
+          })
+          return promise;
+        }
         // DO NOT UPDATE IF IT IS THE SAME SUBSCRIPTIONS
         // AND MAKE SURE COLLECTION ADD AND REMOVE LISTENERS ARE ADDED ONLY ONCE !!!
         let requestOptions = Object.assign({}, options);
@@ -256,7 +272,7 @@ class WappstoStream extends EventEmitter {
                 options.success.apply(this, arguments);
             }
         }
-        return this._updateSubscriptions([...this.stream.get("subscription"), ...subscriptions], requestOptions);
+        return this._updateSubscriptions(subscriptions, requestOptions);
     }
 
     unsubscribe(arr, options) {
@@ -268,7 +284,7 @@ class WappstoStream extends EventEmitter {
             arr = [arr];
         }
         let update = false;
-        let subscriptions = [...this.stream.get("subscription")];
+        let subscriptions = this._getUniqueSubscriptions(this.nextStream || []);
         arr.forEach((obj) => {
             let { path, isModel } = this._getPath(obj);
             if(path){
@@ -282,6 +298,13 @@ class WappstoStream extends EventEmitter {
                 }
             }
         });
+        if(this.updating && options.force !== true){
+            this.nextStream = subscriptions;
+            let promise = new Promise((resolve, reject) => {
+              this.nextStreamPromises.push({resolve, reject});
+            })
+            return promise;
+        }
         if(update){
             return this._updateSubscriptions(subscriptions, options);
         } else if(options.success){
@@ -379,9 +402,38 @@ class WappstoStream extends EventEmitter {
         }, {
             wait: true,
             patch: true,
-            success: options.success,
-            error: options.error,
-            complete: options.complete
+            success: (model, json, response) => {
+              if(!this.nextStream){
+                this.nextStreamPromises.forEach(({resolve, reject}) =>{
+                  resolve(response);
+                });
+                if(options.success){
+                  options.success.call(this, response);
+                }
+              }
+            },
+            error: (model, response) => {
+              if(!this.nextStream){
+                this.nextStreamPromises.forEach(({resolve, reject}) =>{
+                  reject(response);
+                });
+                if(options.error){
+                  options.error.call(this, response);
+                }
+              }
+            },
+            complete: () => {
+              if(this.nextStream){
+                let subscriptions = this.nextStream;
+                this.nextStream = null;
+                this.subscribe(subscriptions, { force: true });
+              } else {
+                this.updating = false;
+              }
+              if(options.complete){
+                options.complete.call(this);
+              }
+            }
         });
     }
 

@@ -45,9 +45,18 @@ class Wappsto {
   }
 
   send(options){
-    options = Object.assign({}, options);
-    options.url = this.util.baseUrl + options.url;
-    return this[_requestInstance].http(options);
+    if(options.generateUrl !== false){
+      if(options.constructor === Object){
+        options = Object.assign({}, options);
+      } else {
+        options = {
+          url: options,
+          method: "GET"
+        }
+      }
+      options.url = this.util.baseUrl + options.url;
+    }
+    return this._sendAndHandle(options);
   }
 
   sendExtsync(options){
@@ -70,7 +79,35 @@ class Wappsto {
       }
       options.url = url;
     }
-    return this[_requestInstance].http(options);
+    return this._sendAndHandle(options);
+  }
+
+  _sendAndHandle(options){
+    let responseFired = false;
+    return this[_requestInstance].http(options)
+    .then((response) => {
+      responseFired = true;
+      response.responseJSON = response.data;
+      this._fireResponse("success", [response.data, response], options);
+      return response;
+    })
+    .catch((response) => {
+      if (responseFired) {
+        Util.throw(response);
+      }
+      responseFired = true;
+      this._fireResponse("error", [response], options);
+      return response;
+    });
+  }
+
+  _fireResponse(type, args, options) {
+    if (options[type]) {
+      options[type].apply(context, args);
+    }
+    if (options.complete) {
+      options.complete.call(context, context);
+    }
   }
 
   create(type, obj = {}, options){
@@ -173,35 +210,47 @@ class Wappsto {
         name: streamJSON.name
       }
     }
-    this.get('stream', searchFor, {
-      expand: 1,
-      success: (streamCollection) => {
-        if (streamCollection.length > 0) {
-          if (!streamJSON.hasOwnProperty('full')) {
-              streamJSON.full = true;
-          }
-          let stream = streamCollection.first();
+    return new Promise((resolve, reject) => {
+      this.get('stream', searchFor, {
+        expand: 1,
+        success: (streamCollection) => {
+          if (streamCollection.length > 0) {
+            if (!streamJSON.hasOwnProperty('full')) {
+                streamJSON.full = true;
+            }
+            let stream = streamCollection.first();
 
-          // merging with json
-          let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
+            // merging with json
+            let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
 
-          if(newJSON){
-            stream.save(newJSON, {
-              patch: true,
-              success: () => {
-                this._startStream(stream, models, options);
-              },
-              error: options.error
-            });
+            if(newJSON){
+              stream.save(newJSON, {
+                patch: true,
+                success: () => {
+                  this._startStream(stream, models, options);
+                },
+                error: (model, response) => {
+                  reject(response);
+                }
+              });
+            } else {
+              this._startStream(stream, models, options, resolve);
+            }
           } else {
-            this._startStream(stream, models, options);
+            this._createStream(streamJSON, models, options, resolve, reject);
           }
-        } else {
-          this._createStream(streamJSON, models, options);
+        },
+        error: (model, response) => {
+          reject(response);
         }
-      },
-      error: options.error
-    });
+      });
+    }).catch((error) => {
+      if(!options.error || options.error.constructor !== Function){
+        throw response;
+      } else {
+        options.error(response);
+      }
+    })
   }
 
   _mergeStreams(oldJSON, newJSON){
@@ -229,17 +278,19 @@ class Wappsto {
     return update ? oldJSON : undefined;
   }
 
-  _createStream(streamJSON, models, options) {
+  _createStream(streamJSON, models, options, resolve, reject) {
     let stream = new this.models.Stream(streamJSON);
     stream.save({}, {
         success: () => {
-            this._startStream(stream, models, options);
+            this._startStream(stream, models, options, resolve);
         },
-        error: options.error
+        error: (model, response) => {
+          reject(response);
+        }
     });
   }
 
-  _startStream(stream, models, options){
+  _startStream(stream, models, options, resolve){
     let wStream = new this.Stream(stream);
     wStream.open();
     if(options.subscribe === true){
@@ -248,6 +299,7 @@ class Wappsto {
     if(options.success){
       options.success(wStream);
     }
+    resolve(wStream);
   }
 }
 
