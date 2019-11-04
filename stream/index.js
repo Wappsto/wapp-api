@@ -5,11 +5,13 @@ const Tracer = require('../tracer');
 const EventEmitter = require('events');
 const Model = require('../models/generic-class');
 const Collection = require('../models/generic-collection');
+const querystring = require('querystring');
 
-const _stream = Symbol("stream");
-const _source = Symbol("source");
-const _util = Symbol.for("generic-util");
-const _relations = "_relations";
+const _stream = Symbol('stream');
+const _source = Symbol('source');
+const _util = Symbol.for('generic-util');
+const _relations = '_relations';
+const _name = Symbol.for('generic-class-name');
 
 class WappstoStream extends EventEmitter {
     constructor(stream) {
@@ -24,7 +26,7 @@ class WappstoStream extends EventEmitter {
         this.on('error', () => {});
         if (stream instanceof Stream) {
             this[_stream] = stream;
-            stream.on("destoy", this.close);
+            stream.on('destoy', this.close);
         }
     }
 
@@ -36,17 +38,35 @@ class WappstoStream extends EventEmitter {
         return this[_source];
     }
 
-    open() {
-        if (this.stream && this.stream.get("meta.id") && WebSocket) {
-            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
-            if (!url.startsWith("http") && window && window.location && window.location.origin) {
+    open(options) {
+        if (WebSocket && this.stream) {
+            const customOptions = Object.assign({}, options);
+            if(!this.stream.get('meta.id')){
+              const newMeta = this.stream.get('meta') || {};
+              newMeta.id = 'open';
+              this.stream.set('meta', newMeta);
+            }
+            let url = this.stream.url(customOptions) + '?x-session=' + this.stream.util.session;
+            if (!url.startsWith('http') && window && window.location && window.location.origin) {
                 url = window.location.origin + url;
             }
-            let ws = new WebSocket(url.replace(/^http/, 'ws'));
+            url = url.replace(/^http/, 'ws');
+            if(customOptions.endPoint){
+              url = url.replace('stream', customOptions.endPoint);
+            } else if(this.stream.util.getServiceVersion('stream')){
+              url = url.replace('stream', 'websocket');
+            }
+            if(this.stream.get('meta.id') === 'open'){
+              const streamClone = this.stream.toJSON();
+              delete streamClone.meta;
+              delete streamClone.name;
+              url += '&' + querystring.stringify(streamClone);
+            }
+            let ws = new WebSocket(url);
             this._addEventListeners(ws);
             this[_source] = ws;
         } else {
-            console.error("cannot connect, stream model not found");
+            console.error('cannot connect, stream model not found');
         }
     }
 
@@ -65,7 +85,7 @@ class WappstoStream extends EventEmitter {
 
     _addEventListeners(source) {
         let self = this,
-            url = self.stream.url().replace(/^http/, 'ws');
+            url = source.url;
 
         let openTimeout = setTimeout(() => {
             self._reconnect();
@@ -163,12 +183,12 @@ class WappstoStream extends EventEmitter {
             };
         }
         switch (event) {
-            case "create":
-                if (message.meta_object.type === "notification") {
+            case 'create':
+                if (message.meta_object.type === 'notification') {
                     this._handleNotification(message.notification, options);
                 } else {
                     if(!this._updateModel(message, options)){
-                        id = message.path.split("/");
+                        id = message.path.split('/');
                         let last = id[id.length - 1];
                         id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
                         models = this.models[id];
@@ -182,15 +202,15 @@ class WappstoStream extends EventEmitter {
                     }
                 }
                 break;
-            case "update":
+            case 'update':
                 this._updateModel(message, options);
                 break;
-            case "delete":
+            case 'delete':
                 id = message.meta_object.id;
                 models = this.models[id];
                 if (models) {
                     models.forEach((model) => {
-                      model.emit("destroy", model, options);
+                      model.emit('destroy', model, options);
                       this.removeModel(model);
                     });
                 }
@@ -204,7 +224,7 @@ class WappstoStream extends EventEmitter {
         let models = this.models[id];
         if (models) {
             models.forEach((model) => {
-              model.emit("stream:message", model, message[message.meta_object.type], message);
+              model.emit('stream:message', model, message[message.meta_object.type], message);
               model.set(message[message.meta_object.type], options);
             });
             return true;
@@ -215,29 +235,29 @@ class WappstoStream extends EventEmitter {
     _handleNotification(notification, options) {
         switch (notification.base.code) {
             case 1100004:
-                this.emit("permission:added", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:added', notification.base.type_ids, notification.base.ids, options);
                 break;
             case 1100013:
-                this.emit("permission:updated", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:updated', notification.base.type_ids, notification.base.ids, options);
                 break;
             case 1100006:
-                this.emit("permission:removed", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:removed', notification.base.type_ids, notification.base.ids, options);
                 break;
             case 1100007:
-                this.emit("permission:revoked", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:revoked', notification.base.type_ids, notification.base.ids, options);
                 break;
 
         }
     }
 
     _getUniqueSubscriptions(subscriptions){
-      let allSubscriptions = [...this.stream.get("subscription"), ...subscriptions];
+      let allSubscriptions = [...this.stream.get('subscription'), ...subscriptions];
       return allSubscriptions.filter((value, index, self) => self.indexOf(value) === index);
     }
 
     subscribe(arr, options = {}) {
         if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
+            console.error('stream model is not found, cannot update subscriptions');
             return;
         }
         if(arr.constructor !== Array && !(arr instanceof Collection)){
@@ -277,7 +297,7 @@ class WappstoStream extends EventEmitter {
 
     unsubscribe(arr, options) {
         if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
+            console.error('stream model is not found, cannot update subscriptions');
             return;
         }
         if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
@@ -315,7 +335,7 @@ class WappstoStream extends EventEmitter {
     _getModelUrl(model) {
         return model.url({
             full: false
-        }).replace(model.util.baseUrl, "");
+        }).replace(model.util.getServiceUrl(model[_name]), '');
     }
 
     addModel(model) {
@@ -353,7 +373,7 @@ class WappstoStream extends EventEmitter {
     }
 
     _addModelToCache(model) {
-        let id = model.get("meta.id");
+        let id = model.get('meta.id');
         if (!this.models.hasOwnProperty(id)) {
           this.models[id] = [model];
         } else {
@@ -364,7 +384,7 @@ class WappstoStream extends EventEmitter {
     }
 
     _removeModelFromCache(model) {
-        let id = model.get("meta.id");
+        let id = model.get('meta.id');
         if(this.models[id]){
           let index = this.models[id].indexOf(model);
           if(index !== -1){
@@ -377,13 +397,13 @@ class WappstoStream extends EventEmitter {
     }
 
     _addCollectionListener(collection){
-        collection.on("add", this._collectionAddCallback);
-        collection.on("remove", this._collectionRemoveCallback);
+        collection.on('add', this._collectionAddCallback);
+        collection.on('remove', this._collectionRemoveCallback);
     }
 
     _removeCollectionListener(collection){
-        collection.off("add", this._collectionAddCallback);
-        collection.off("remove", this._collectionRemoveCallback);
+        collection.off('add', this._collectionAddCallback);
+        collection.off('remove', this._collectionRemoveCallback);
     }
 
     _collectionAddCallback(collection, model, options){
@@ -395,7 +415,7 @@ class WappstoStream extends EventEmitter {
     }
 
     _updateSubscriptions(subscription, options) {
-        this.stream.set("subscription", subscription);
+        this.stream.set('subscription', subscription);
         return this.stream.save({
             subscription,
             full: true
@@ -439,9 +459,9 @@ class WappstoStream extends EventEmitter {
 
     _getPath(obj) {
         let isObject = obj instanceof Object;
-        let isString = typeof(obj) === "string";
+        let isString = typeof(obj) === 'string';
         if (!isObject && !isString) {
-            console.error("argument must be a string, an object or a class");
+            console.error('argument must be a string, an object or a class');
             return {
                 path: undefined,
                 isModel: false,
@@ -453,7 +473,7 @@ class WappstoStream extends EventEmitter {
         if (isModel) {
             path = this._getModelUrl(obj);
         } else if (isObject) {
-            path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+            path = obj.meta && obj.meta.id && obj.meta.type && '/' + obj.meta.type + '/' + obj.meta.id;
         } else {
             path = obj;
         }

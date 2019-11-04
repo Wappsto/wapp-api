@@ -8,7 +8,7 @@ class State extends Generic{
   getLogs(options = {}){
     if(this.get("meta.id")){
       options.method = "GET";
-      options.url = this.util.baseUrl + "/log/" + this.get("meta.id") + "?type=" + this[_name];
+      options.url = this.util.getServiceUrl('log') + "/" + this.get("meta.id") + "?type=" + this[_name];
       options.parse = false;
       return this._request(options);
     }

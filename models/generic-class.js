@@ -338,11 +338,10 @@ class Generic extends EventEmitter {
     }
 
     url(options = {}) {
-        let startUrl = (options.full !== false && this.parent()) ? this.parent().url() : this.util.baseUrl;
         if (this.get("meta.id")) {
-            return startUrl + '/' + this[_name] + '/' + this.get("meta").id;
+            return this.util.getServiceUrl(this[_name], options) + '/' + this.get("meta").id;
         } else {
-            return startUrl + '/' + this[_name];
+            return this.util.getServiceUrl(this[_name], options);
         }
     }
 }

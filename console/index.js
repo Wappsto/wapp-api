@@ -1,7 +1,7 @@
 // Saving console functions
 let defaultConsole = Object.assign({}, console);
 
-var start = function(session) {
+var start = function(session, customOptions) {
     const http = require("http");
     // Getting token, session and installation Id
     let sessionID = session || process.env.sessionID;
@@ -10,11 +10,12 @@ var start = function(session) {
       return;
     }
 
+    const version = customOptions && customOptions.version ? customOptions + '/' : '';
     // Extsync request options
     const options = {
         hostname: 'rest-service',
         port: 80,
-        path: '/services/extsync/wappsto/editor/console',
+        path: '/services/' + version + 'extsync/wappsto/editor/console',
         method: 'POST',
         headers: {
             'x-session': sessionID,

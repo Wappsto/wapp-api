@@ -1,5 +1,4 @@
 let fetch;
-let baseUrl;
 let isBrowser;
 
 let tracer = {

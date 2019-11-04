@@ -31,7 +31,7 @@ Device["_relations"] = [{
 
 module.exports = Device;
 
-},{"../util":43,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
+},{"../util":42,"./generic-class":3,"./set":9,"./value":12}],3:[function(require,module,exports){
 const Util = require('../util');
 const EventEmitter = require('events');
 const Collection = require('./generic-collection');
@@ -372,18 +372,17 @@ class Generic extends EventEmitter {
     }
 
     url(options = {}) {
-        let startUrl = (options.full !== false && this.parent()) ? this.parent().url() : this.util.baseUrl;
         if (this.get("meta.id")) {
-            return startUrl + '/' + this[_name] + '/' + this.get("meta").id;
+            return this.util.getServiceUrl(this[_name], options) + '/' + this.get("meta").id;
         } else {
-            return startUrl + '/' + this[_name];
+            return this.util.getServiceUrl(this[_name], options);
         }
     }
 }
 
 module.exports = Generic;
 
-},{"../util":43,"./generic-collection":4,"./request":8,"events":51}],4:[function(require,module,exports){
+},{"../util":42,"./generic-collection":4,"./request":8,"events":50}],4:[function(require,module,exports){
 const Util = require('../util');
 const EventEmitter = require('events');
 let Request;
@@ -708,15 +707,22 @@ class Collection extends EventEmitter {
         return this.models[index];
     }
 
-    url() {
-        let url = this.parent() ? this.parent().url() : this.util.baseUrl;
+    url(options) {
         if(!this[_className] && this[_class]){
             let instance = new this[_class];
             this[_className] = instance.constructor.name.charAt(0).toLowerCase() + instance.constructor.name.slice(1)
         }
-        if (this[_className]) {
-            url += "/" + this[_className];
+
+        let url = '';
+        if(this.parent()){
+          url = this.parent.url(options);
+          if (this[_className]) {
+              url += "/" + this[_className];
+          }
+        } else if(this[_className]){
+          url = this.util.getServiceUrl(this[_className], options);
         }
+
         return url;
     }
 
@@ -771,7 +777,7 @@ class Collection extends EventEmitter {
 
 module.exports = Collection;
 
-},{"../util":43,"./generic-class":3,"./request":8,"events":51}],5:[function(require,module,exports){
+},{"../util":42,"./generic-class":3,"./request":8,"events":50}],5:[function(require,module,exports){
 const Request = require('./request');
 const Util = require('../util');
 
@@ -816,7 +822,7 @@ class WappstoModels {
 
 module.exports = WappstoModels;
 
-},{"../util":43,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
+},{"../util":42,"./data":1,"./device":2,"./generic-class":3,"./generic-collection":4,"./network":6,"./notification":7,"./request":8,"./set":9,"./state":10,"./stream":11,"./value":12}],6:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Device = require('./device');
@@ -842,7 +848,7 @@ Network["_relations"] = [{
 
 module.exports = Network;
 
-},{"../util":43,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
+},{"../util":42,"./device":2,"./generic-class":3,"./set":9}],7:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 
@@ -856,7 +862,7 @@ Notification[_pickAttributes] = {
 
 module.exports = Notification;
 
-},{"../util":43,"./generic-class":3}],8:[function(require,module,exports){
+},{"../util":42,"./generic-class":3}],8:[function(require,module,exports){
 const Tracer = require('../tracer');
 const axios = require('axios');
 const Collection = require('./generic-collection');
@@ -904,7 +910,7 @@ class Request {
 
 module.exports = Request;
 
-},{"../tracer":42,"../util":43,"./generic-collection":4,"axios":13}],9:[function(require,module,exports){
+},{"../tracer":41,"../util":42,"./generic-collection":4,"axios":13}],9:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require('./generic-class');
 const Collection = require('./generic-collection');
@@ -988,7 +994,7 @@ Set[_pickAttributes] = {
 
 module.exports = Set;
 
-},{"../util":43,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
+},{"../util":42,"./generic-class":3,"./generic-collection":4}],10:[function(require,module,exports){
 const Generic = require('./generic-class');
 
 const _pickAttributes = Symbol.for("generic-class-pickAttributes");
@@ -999,7 +1005,7 @@ class State extends Generic{
   getLogs(options = {}){
     if(this.get("meta.id")){
       options.method = "GET";
-      options.url = this.util.baseUrl + "/log/" + this.get("meta.id") + "?type=" + this[_name];
+      options.url = this.util.getServiceUrl('log') + "/" + this.get("meta.id") + "?type=" + this[_name];
       options.parse = false;
       return this._request(options);
     }
@@ -1031,7 +1037,7 @@ Stream[_pickAttributes] = {
 
 module.exports = Stream;
 
-},{"../util":43,"./generic-class":3}],12:[function(require,module,exports){
+},{"../util":42,"./generic-class":3}],12:[function(require,module,exports){
 const Util = require('../util');
 const Generic = require("./generic-class");
 const State = require('./state');
@@ -1057,10 +1063,9 @@ Value["_relations"] = [{
 
 module.exports = Value;
 
-},{"../util":43,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
+},{"../util":42,"./generic-class":3,"./set":9,"./state":10}],13:[function(require,module,exports){
 module.exports = require('./lib/axios');
 },{"./lib/axios":15}],14:[function(require,module,exports){
-(function (process){
 'use strict';
 
 var utils = require('./../utils');
@@ -1069,7 +1074,6 @@ var buildURL = require('./../helpers/buildURL');
 var parseHeaders = require('./../helpers/parseHeaders');
 var isURLSameOrigin = require('./../helpers/isURLSameOrigin');
 var createError = require('../core/createError');
-var btoa = (typeof window !== 'undefined' && window.btoa && window.btoa.bind(window)) || require('./../helpers/btoa');
 
 module.exports = function xhrAdapter(config) {
   return new Promise(function dispatchXhrRequest(resolve, reject) {
@@ -1081,22 +1085,6 @@ module.exports = function xhrAdapter(config) {
     }
 
     var request = new XMLHttpRequest();
-    var loadEvent = 'onreadystatechange';
-    var xDomain = false;
-
-    // For IE 8/9 CORS support
-    // Only supports POST and GET calls and doesn't returns the response headers.
-    // DON'T do this for testing b/c XMLHttpRequest is mocked, not XDomainRequest.
-    if (process.env.NODE_ENV !== 'test' &&
-        typeof window !== 'undefined' &&
-        window.XDomainRequest && !('withCredentials' in request) &&
-        !isURLSameOrigin(config.url)) {
-      request = new window.XDomainRequest();
-      loadEvent = 'onload';
-      xDomain = true;
-      request.onprogress = function handleProgress() {};
-      request.ontimeout = function handleTimeout() {};
-    }
 
     // HTTP basic authentication
     if (config.auth) {
@@ -1111,8 +1099,8 @@ module.exports = function xhrAdapter(config) {
     request.timeout = config.timeout;
 
     // Listen for ready state
-    request[loadEvent] = function handleLoad() {
-      if (!request || (request.readyState !== 4 && !xDomain)) {
+    request.onreadystatechange = function handleLoad() {
+      if (!request || request.readyState !== 4) {
         return;
       }
 
@@ -1129,9 +1117,8 @@ module.exports = function xhrAdapter(config) {
       var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
       var response = {
         data: responseData,
-        // IE sends 1223 instead of 204 (https://github.com/axios/axios/issues/201)
-        status: request.status === 1223 ? 204 : request.status,
-        statusText: request.status === 1223 ? 'No Content' : request.statusText,
+        status: request.status,
+        statusText: request.statusText,
         headers: responseHeaders,
         config: config,
         request: request
@@ -1242,8 +1229,7 @@ module.exports = function xhrAdapter(config) {
   });
 };
 
-}).call(this,require('_process'))
-},{"../core/createError":21,"./../core/settle":24,"./../helpers/btoa":28,"./../helpers/buildURL":29,"./../helpers/cookies":31,"./../helpers/isURLSameOrigin":33,"./../helpers/parseHeaders":35,"./../utils":37,"_process":58}],15:[function(require,module,exports){
+},{"../core/createError":21,"./../core/settle":24,"./../helpers/buildURL":28,"./../helpers/cookies":30,"./../helpers/isURLSameOrigin":32,"./../helpers/parseHeaders":34,"./../utils":36}],15:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -1297,7 +1283,7 @@ module.exports = axios;
 // Allow use of default import syntax in TypeScript
 module.exports.default = axios;
 
-},{"./cancel/Cancel":16,"./cancel/CancelToken":17,"./cancel/isCancel":18,"./core/Axios":19,"./defaults":26,"./helpers/bind":27,"./helpers/spread":36,"./utils":37}],16:[function(require,module,exports){
+},{"./cancel/Cancel":16,"./cancel/CancelToken":17,"./cancel/isCancel":18,"./core/Axios":19,"./defaults":26,"./helpers/bind":27,"./helpers/spread":35,"./utils":36}],16:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1465,7 +1451,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = Axios;
 
-},{"./../defaults":26,"./../utils":37,"./InterceptorManager":20,"./dispatchRequest":22}],20:[function(require,module,exports){
+},{"./../defaults":26,"./../utils":36,"./InterceptorManager":20,"./dispatchRequest":22}],20:[function(require,module,exports){
 'use strict';
 
 var utils = require('./../utils');
@@ -1519,7 +1505,7 @@ InterceptorManager.prototype.forEach = function forEach(fn) {
 
 module.exports = InterceptorManager;
 
-},{"./../utils":37}],21:[function(require,module,exports){
+},{"./../utils":36}],21:[function(require,module,exports){
 'use strict';
 
 var enhanceError = require('./enhanceError');
@@ -1627,7 +1613,7 @@ module.exports = function dispatchRequest(config) {
   });
 };
 
-},{"../cancel/isCancel":18,"../defaults":26,"./../helpers/combineURLs":30,"./../helpers/isAbsoluteURL":32,"./../utils":37,"./transformData":25}],23:[function(require,module,exports){
+},{"../cancel/isCancel":18,"../defaults":26,"./../helpers/combineURLs":29,"./../helpers/isAbsoluteURL":31,"./../utils":36,"./transformData":25}],23:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1700,7 +1686,7 @@ module.exports = function transformData(data, headers, fns) {
   return data;
 };
 
-},{"./../utils":37}],26:[function(require,module,exports){
+},{"./../utils":36}],26:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -1800,7 +1786,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 module.exports = defaults;
 
 }).call(this,require('_process'))
-},{"./adapters/http":14,"./adapters/xhr":14,"./helpers/normalizeHeaderName":34,"./utils":37,"_process":58}],27:[function(require,module,exports){
+},{"./adapters/http":14,"./adapters/xhr":14,"./helpers/normalizeHeaderName":33,"./utils":36,"_process":57}],27:[function(require,module,exports){
 'use strict';
 
 module.exports = function bind(fn, thisArg) {
@@ -1814,44 +1800,6 @@ module.exports = function bind(fn, thisArg) {
 };
 
 },{}],28:[function(require,module,exports){
-'use strict';
-
-// btoa polyfill for IE<10 courtesy https://github.com/davidchambers/Base64.js
-
-var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-function E() {
-  this.message = 'String contains an invalid character';
-}
-E.prototype = new Error;
-E.prototype.code = 5;
-E.prototype.name = 'InvalidCharacterError';
-
-function btoa(input) {
-  var str = String(input);
-  var output = '';
-  for (
-    // initialize result and counter
-    var block, charCode, idx = 0, map = chars;
-    // if the next str index does not exist:
-    //   change the mapping table to "="
-    //   check if d has no fractional digits
-    str.charAt(idx | 0) || (map = '=', idx % 1);
-    // "8 - idx % 1 * 8" generates the sequence 2, 4, 6, 8
-    output += map.charAt(63 & block >> 8 - idx % 1 * 8)
-  ) {
-    charCode = str.charCodeAt(idx += 3 / 4);
-    if (charCode > 0xFF) {
-      throw new E();
-    }
-    block = block << 8 | charCode;
-  }
-  return output;
-}
-
-module.exports = btoa;
-
-},{}],29:[function(require,module,exports){
 'use strict';
 
 var utils = require('./../utils');
@@ -1919,7 +1867,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
   return url;
 };
 
-},{"./../utils":37}],30:[function(require,module,exports){
+},{"./../utils":36}],29:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1935,7 +1883,7 @@ module.exports = function combineURLs(baseURL, relativeURL) {
     : baseURL;
 };
 
-},{}],31:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 'use strict';
 
 var utils = require('./../utils');
@@ -1990,7 +1938,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":37}],32:[function(require,module,exports){
+},{"./../utils":36}],31:[function(require,module,exports){
 'use strict';
 
 /**
@@ -2006,7 +1954,7 @@ module.exports = function isAbsoluteURL(url) {
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
 };
 
-},{}],33:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 'use strict';
 
 var utils = require('./../utils');
@@ -2076,7 +2024,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":37}],34:[function(require,module,exports){
+},{"./../utils":36}],33:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -2090,7 +2038,7 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
   });
 };
 
-},{"../utils":37}],35:[function(require,module,exports){
+},{"../utils":36}],34:[function(require,module,exports){
 'use strict';
 
 var utils = require('./../utils');
@@ -2145,7 +2093,7 @@ module.exports = function parseHeaders(headers) {
   return parsed;
 };
 
-},{"./../utils":37}],36:[function(require,module,exports){
+},{"./../utils":36}],35:[function(require,module,exports){
 'use strict';
 
 /**
@@ -2174,7 +2122,7 @@ module.exports = function spread(callback) {
   };
 };
 
-},{}],37:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 'use strict';
 
 var bind = require('./helpers/bind');
@@ -2479,7 +2427,7 @@ module.exports = {
   trim: trim
 };
 
-},{"./helpers/bind":27,"is-buffer":38}],38:[function(require,module,exports){
+},{"./helpers/bind":27,"is-buffer":37}],37:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -2487,22 +2435,12 @@ module.exports = {
  * @license  MIT
  */
 
-// The _isBuffer check is for Safari 5-7 support, because it's missing
-// Object.prototype.constructor. Remove this eventually
-module.exports = function (obj) {
-  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
+module.exports = function isBuffer (obj) {
+  return obj != null && obj.constructor != null &&
+    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
 }
 
-function isBuffer (obj) {
-  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
-}
-
-// For Node v0.10 support. Remove this eventually.
-function isSlowBuffer (obj) {
-  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
-}
-
-},{}],39:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict';
 
 module.exports = function() {
@@ -2512,7 +2450,7 @@ module.exports = function() {
   );
 };
 
-},{}],40:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 const WebSocket = require('./stream-polyfill');
 const Stream = require('../models/stream');
 const Util = require('../util');
@@ -2520,23 +2458,28 @@ const Tracer = require('../tracer');
 const EventEmitter = require('events');
 const Model = require('../models/generic-class');
 const Collection = require('../models/generic-collection');
+const querystring = require('querystring');
 
-const _stream = Symbol("stream");
-const _source = Symbol("source");
-const _util = Symbol.for("generic-util");
-const _relations = "_relations";
+const _stream = Symbol('stream');
+const _source = Symbol('source');
+const _util = Symbol.for('generic-util');
+const _relations = '_relations';
+const _name = Symbol.for('generic-class-name');
 
 class WappstoStream extends EventEmitter {
     constructor(stream) {
         super();
         this.models = {};
+        this.nextStream = false;
+        this.nextStreamPromises = [];
+        this.updating = false;
         this.close = this.close.bind(this);
         this._collectionAddCallback = this._collectionAddCallback.bind(this);
         this._collectionRemoveCallback = this._collectionRemoveCallback.bind(this);
         this.on('error', () => {});
         if (stream instanceof Stream) {
             this[_stream] = stream;
-            stream.on("destoy", this.close);
+            stream.on('destoy', this.close);
         }
     }
 
@@ -2548,17 +2491,35 @@ class WappstoStream extends EventEmitter {
         return this[_source];
     }
 
-    open() {
-        if (this.stream && this.stream.get("meta.id") && WebSocket) {
-            let url = this.stream.url() + '?x-session=' + this.stream.util.session;
-            if (!url.startsWith("http") && window && window.location && window.location.origin) {
+    open(options) {
+        if (WebSocket && this.stream) {
+            const customOptions = Object.assign({}, options);
+            if(!this.stream.get('meta.id')){
+              const newMeta = this.stream.get('meta') || {};
+              newMeta.id = 'open';
+              this.stream.set('meta', newMeta);
+            }
+            let url = this.stream.url(customOptions) + '?x-session=' + this.stream.util.session;
+            if (!url.startsWith('http') && window && window.location && window.location.origin) {
                 url = window.location.origin + url;
             }
-            let ws = new WebSocket(url.replace(/^http/, 'ws'));
+            url = url.replace(/^http/, 'ws');
+            if(customOptions.endPoint){
+              url = url.replace('stream', customOptions.endPoint);
+            } else if(this.stream.util.getServiceVersion('stream')){
+              url = url.replace('stream', 'websocket');
+            }
+            if(this.stream.get('meta.id') === 'open'){
+              const streamClone = this.stream.toJSON();
+              delete streamClone.meta;
+              delete streamClone.name;
+              url += '&' + querystring.stringify(streamClone);
+            }
+            let ws = new WebSocket(url);
             this._addEventListeners(ws);
             this[_source] = ws;
         } else {
-            console.error("cannot connect, stream model not found");
+            console.error('cannot connect, stream model not found');
         }
     }
 
@@ -2577,7 +2538,7 @@ class WappstoStream extends EventEmitter {
 
     _addEventListeners(source) {
         let self = this,
-            url = self.stream.url().replace(/^http/, 'ws');
+            url = source.url;
 
         let openTimeout = setTimeout(() => {
             self._reconnect();
@@ -2675,12 +2636,12 @@ class WappstoStream extends EventEmitter {
             };
         }
         switch (event) {
-            case "create":
-                if (message.meta_object.type === "notification") {
+            case 'create':
+                if (message.meta_object.type === 'notification') {
                     this._handleNotification(message.notification, options);
                 } else {
                     if(!this._updateModel(message, options)){
-                        id = message.path.split("/");
+                        id = message.path.split('/');
                         let last = id[id.length - 1];
                         id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
                         models = this.models[id];
@@ -2694,15 +2655,15 @@ class WappstoStream extends EventEmitter {
                     }
                 }
                 break;
-            case "update":
+            case 'update':
                 this._updateModel(message, options);
                 break;
-            case "delete":
+            case 'delete':
                 id = message.meta_object.id;
                 models = this.models[id];
                 if (models) {
                     models.forEach((model) => {
-                      model.emit("destroy", model, options);
+                      model.emit('destroy', model, options);
                       this.removeModel(model);
                     });
                 }
@@ -2716,7 +2677,7 @@ class WappstoStream extends EventEmitter {
         let models = this.models[id];
         if (models) {
             models.forEach((model) => {
-              model.emit("stream:message", model, message[message.meta_object.type], message);
+              model.emit('stream:message', model, message[message.meta_object.type], message);
               model.set(message[message.meta_object.type], options);
             });
             return true;
@@ -2727,24 +2688,29 @@ class WappstoStream extends EventEmitter {
     _handleNotification(notification, options) {
         switch (notification.base.code) {
             case 1100004:
-                this.emit("permission:added", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:added', notification.base.type_ids, notification.base.ids, options);
                 break;
             case 1100013:
-                this.emit("permission:updated", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:updated', notification.base.type_ids, notification.base.ids, options);
                 break;
             case 1100006:
-                this.emit("permission:removed", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:removed', notification.base.type_ids, notification.base.ids, options);
                 break;
             case 1100007:
-                this.emit("permission:revoked", notification.base.type_ids, notification.base.ids, options);
+                this.emit('permission:revoked', notification.base.type_ids, notification.base.ids, options);
                 break;
 
         }
     }
 
+    _getUniqueSubscriptions(subscriptions){
+      let allSubscriptions = [...this.stream.get('subscription'), ...subscriptions];
+      return allSubscriptions.filter((value, index, self) => self.indexOf(value) === index);
+    }
+
     subscribe(arr, options = {}) {
         if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
+            console.error('stream model is not found, cannot update subscriptions');
             return;
         }
         if(arr.constructor !== Array && !(arr instanceof Collection)){
@@ -2762,6 +2728,14 @@ class WappstoStream extends EventEmitter {
             }
         });
         if(subscriptions.length === 0) return;
+        subscriptions = this._getUniqueSubscriptions(subscriptions);
+        if(this.updating){
+          this.nextStream = subscriptions;
+          let promise = new Promise((resolve, reject) => {
+            this.nextStreamPromises.push({resolve, reject});
+          })
+          return promise;
+        }
         // DO NOT UPDATE IF IT IS THE SAME SUBSCRIPTIONS
         // AND MAKE SURE COLLECTION ADD AND REMOVE LISTENERS ARE ADDED ONLY ONCE !!!
         let requestOptions = Object.assign({}, options);
@@ -2771,19 +2745,19 @@ class WappstoStream extends EventEmitter {
                 options.success.apply(this, arguments);
             }
         }
-        return this._updateSubscriptions([...this.stream.get("subscription"), ...subscriptions], requestOptions);
+        return this._updateSubscriptions(subscriptions, requestOptions);
     }
 
     unsubscribe(arr, options) {
         if (!this.stream) {
-            console.error("stream model is not found, cannot update subscriptions");
+            console.error('stream model is not found, cannot update subscriptions');
             return;
         }
         if(arr.constructor !== Array && !(arr.constructor.prototype instanceof Collection)){
             arr = [arr];
         }
         let update = false;
-        let subscriptions = [...this.stream.get("subscription")];
+        let subscriptions = this._getUniqueSubscriptions(this.nextStream || []);
         arr.forEach((obj) => {
             let { path, isModel } = this._getPath(obj);
             if(path){
@@ -2797,6 +2771,13 @@ class WappstoStream extends EventEmitter {
                 }
             }
         });
+        if(this.updating && options.force !== true){
+            this.nextStream = subscriptions;
+            let promise = new Promise((resolve, reject) => {
+              this.nextStreamPromises.push({resolve, reject});
+            })
+            return promise;
+        }
         if(update){
             return this._updateSubscriptions(subscriptions, options);
         } else if(options.success){
@@ -2807,7 +2788,7 @@ class WappstoStream extends EventEmitter {
     _getModelUrl(model) {
         return model.url({
             full: false
-        }).replace(model.util.baseUrl, "");
+        }).replace(model.util.getServiceUrl(model[_name]), '');
     }
 
     addModel(model) {
@@ -2845,7 +2826,7 @@ class WappstoStream extends EventEmitter {
     }
 
     _addModelToCache(model) {
-        let id = model.get("meta.id");
+        let id = model.get('meta.id');
         if (!this.models.hasOwnProperty(id)) {
           this.models[id] = [model];
         } else {
@@ -2856,7 +2837,7 @@ class WappstoStream extends EventEmitter {
     }
 
     _removeModelFromCache(model) {
-        let id = model.get("meta.id");
+        let id = model.get('meta.id');
         if(this.models[id]){
           let index = this.models[id].indexOf(model);
           if(index !== -1){
@@ -2869,13 +2850,13 @@ class WappstoStream extends EventEmitter {
     }
 
     _addCollectionListener(collection){
-        collection.on("add", this._collectionAddCallback);
-        collection.on("remove", this._collectionRemoveCallback);
+        collection.on('add', this._collectionAddCallback);
+        collection.on('remove', this._collectionRemoveCallback);
     }
 
     _removeCollectionListener(collection){
-        collection.off("add", this._collectionAddCallback);
-        collection.off("remove", this._collectionRemoveCallback);
+        collection.off('add', this._collectionAddCallback);
+        collection.off('remove', this._collectionRemoveCallback);
     }
 
     _collectionAddCallback(collection, model, options){
@@ -2887,24 +2868,53 @@ class WappstoStream extends EventEmitter {
     }
 
     _updateSubscriptions(subscription, options) {
-        this.stream.set("subscription", subscription);
+        this.stream.set('subscription', subscription);
         return this.stream.save({
             subscription,
             full: true
         }, {
             wait: true,
             patch: true,
-            success: options.success,
-            error: options.error,
-            complete: options.complete
+            success: (model, json, response) => {
+              if(!this.nextStream){
+                this.nextStreamPromises.forEach(({resolve, reject}) =>{
+                  resolve(response);
+                });
+                if(options.success){
+                  options.success.call(this, response);
+                }
+              }
+            },
+            error: (model, response) => {
+              if(!this.nextStream){
+                this.nextStreamPromises.forEach(({resolve, reject}) =>{
+                  reject(response);
+                });
+                if(options.error){
+                  options.error.call(this, response);
+                }
+              }
+            },
+            complete: () => {
+              if(this.nextStream){
+                let subscriptions = this.nextStream;
+                this.nextStream = null;
+                this.subscribe(subscriptions, { force: true });
+              } else {
+                this.updating = false;
+              }
+              if(options.complete){
+                options.complete.call(this);
+              }
+            }
         });
     }
 
     _getPath(obj) {
         let isObject = obj instanceof Object;
-        let isString = typeof(obj) === "string";
+        let isString = typeof(obj) === 'string';
         if (!isObject && !isString) {
-            console.error("argument must be a string, an object or a class");
+            console.error('argument must be a string, an object or a class');
             return {
                 path: undefined,
                 isModel: false,
@@ -2916,7 +2926,7 @@ class WappstoStream extends EventEmitter {
         if (isModel) {
             path = this._getModelUrl(obj);
         } else if (isObject) {
-            path = obj.meta && obj.meta.id && obj.meta.type && "/" + obj.meta.type + "/" + obj.meta.id;
+            path = obj.meta && obj.meta.id && obj.meta.type && '/' + obj.meta.type + '/' + obj.meta.id;
         } else {
             path = obj;
         }
@@ -2930,7 +2940,7 @@ class WappstoStream extends EventEmitter {
 
 module.exports = WappstoStream;
 
-},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":42,"../util":43,"./stream-polyfill":41,"events":51}],41:[function(require,module,exports){
+},{"../models/generic-class":3,"../models/generic-collection":4,"../models/stream":11,"../tracer":41,"../util":42,"./stream-polyfill":40,"events":50,"querystring":61}],40:[function(require,module,exports){
 let WebSocket;
 if(typeof window === 'object' && window.document && window.WebSocket){
     WebSocket = window.WebSocket;
@@ -2940,9 +2950,8 @@ if(typeof window === 'object' && window.document && window.WebSocket){
 
 module.exports = WebSocket;
 
-},{"ws":39}],42:[function(require,module,exports){
+},{"ws":38}],41:[function(require,module,exports){
 let fetch;
-let baseUrl;
 let isBrowser;
 
 let tracer = {
@@ -3186,7 +3195,7 @@ const checkResponseTrace = function(status, response, nodeId, session){
 
 module.exports = tracer;
 
-},{"http":74,"https":52}],43:[function(require,module,exports){
+},{"http":73,"https":51}],42:[function(require,module,exports){
 (function (process){
 let baseUrl, session, token;
 
@@ -3252,6 +3261,21 @@ module.exports = {
       define(newUtil, "version", util.version || this.version);
       define(newUtil, "baseUrl", util.baseUrl || this.baseUrl);
       define(newUtil, "token", util.token || token);
+      define(newUtil, "serviceVersion", util.serviceVersion || {});
+      define(newUtil, "getServiceVersion", function (service) {
+        if (service && this.serviceVersion) {
+          if (this.serviceVersion.hasOwnProperty(service)) {
+            return this.serviceVersion[service];
+          } else {
+            return this.serviceVersion.default;
+          }
+        }
+        return undefined;
+      });
+      define(newUtil, "getServiceUrl", function(service, options){
+        const version = options && options.hasOwnProperty('version') ? options.version : this.getServiceVersion(service);
+        return this.baseUrl + (version ? '/' + version : '') + '/' + service;
+      });
       return newUtil;
     },
     throw: function(response){
@@ -3261,7 +3285,7 @@ module.exports = {
 }
 
 }).call(this,require('_process'))
-},{"_process":58}],44:[function(require,module,exports){
+},{"_process":57}],43:[function(require,module,exports){
 const querystring = require('querystring');
 
 const Models = require('../models');
@@ -3276,6 +3300,7 @@ const _Stream = Symbol("Stream");
 const _class = "defaultModel";
 const _className = Symbol.for("generic-collection-className");
 const _requestInstance = "_requestInstance";
+const _name = Symbol.for("generic-class-name");
 
 class Wappsto {
   constructor(request) {
@@ -3318,7 +3343,8 @@ class Wappsto {
           method: "GET"
         }
       }
-      options.url = this.util.baseUrl + options.url;
+      const service = options.url.split('/')[0];
+      options.url = this.util.getServiceUrl(service) + options.url;
     }
     return this._sendAndHandle(options);
   }
@@ -3326,7 +3352,7 @@ class Wappsto {
   sendExtsync(options){
     if(options.generateUrl !== false){
       options = Object.assign({}, options);
-      let url = this.util.baseUrl + '/extsync';
+      let url = this.util.getServiceUrl('extsync', options);
       if(options.type === "request"){
         url += '/request';
       } else if(options.type === "response"){
@@ -3413,7 +3439,7 @@ class Wappsto {
       }
 
       let requestOptions = Object.assign({}, options, {
-        url: this.util.baseUrl + "/" + searchIn + "?" + data
+        url: this.util.getServiceUrl(searchIn, options) + "?" + data
       });
       return collection.fetch(requestOptions);
   }
@@ -3455,7 +3481,7 @@ class Wappsto {
       let paths = [];
       streamJSON.forEach((obj) => {
         if(obj instanceof this.models.Model){
-          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
+          let url = model.url().replace(model.util.getServiceUrl(model[_name]), "");
           paths.push(url);
           models.push(obj);
         } else if(obj.constructor === Object){
@@ -3475,44 +3501,50 @@ class Wappsto {
       }
     }
     return new Promise((resolve, reject) => {
-      this.get('stream', searchFor, {
-        expand: 1,
-        success: (streamCollection) => {
-          if (streamCollection.length > 0) {
-            if (!streamJSON.hasOwnProperty('full')) {
-                streamJSON.full = true;
-            }
-            let stream = streamCollection.first();
+      const streamServiceVersion = this.util.getServiceVersion('stream');
+      if (!streamJSON.hasOwnProperty('full')) {
+          streamJSON.full = true;
+      }
+      if(streamServiceVersion){
+        let stream = new this.models.Stream(streamJSON);
+        this._startStream(stream, models, options, resolve);
+      } else {
+        this.get('stream', searchFor, {
+          expand: 1,
+          success: (streamCollection) => {
+            if (streamCollection.length > 0) {
+              let stream = streamCollection.first();
 
-            // merging with json
-            let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
+              // merging with json
+              let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
 
-            if(newJSON){
-              stream.save(newJSON, {
-                patch: true,
-                success: () => {
-                  this._startStream(stream, models, options);
-                },
-                error: (model, response) => {
-                  reject(response);
-                }
-              });
+              if(newJSON){
+                stream.save(newJSON, {
+                  patch: true,
+                  success: () => {
+                    this._startStream(stream, models, options);
+                  },
+                  error: (model, response) => {
+                    reject(response);
+                  }
+                });
+              } else {
+                this._startStream(stream, models, options, resolve);
+              }
             } else {
-              this._startStream(stream, models, options, resolve);
+              this._createStream(streamJSON, models, options, resolve, reject);
             }
-          } else {
-            this._createStream(streamJSON, models, options, resolve, reject);
+          },
+          error: (model, response) => {
+            reject(response);
           }
-        },
-        error: (model, response) => {
-          reject(response);
-        }
-      });
+        });
+      }
     }).catch((error) => {
       if(!options.error || options.error.constructor !== Function){
-        throw response;
+        throw error;
       } else {
-        options.error(response);
+        options.error(error);
       }
     })
   }
@@ -3556,7 +3588,7 @@ class Wappsto {
 
   _startStream(stream, models, options, resolve){
     let wStream = new this.Stream(stream);
-    wStream.open();
+    wStream.open(options);
     if(options.subscribe === true){
       wStream.subscribe(models);
     }
@@ -3577,7 +3609,7 @@ try {
 
 module.exports = Wappsto;
 
-},{"../models":5,"../stream":40,"../util":43,"./request":45,"querystring":62}],45:[function(require,module,exports){
+},{"../models":5,"../stream":39,"../util":42,"./request":44,"querystring":61}],44:[function(require,module,exports){
 const Request = require('../models/request');
 const StreamModel = require('../models/stream');
 const Collection = require('../models/generic-collection');
@@ -3726,7 +3758,7 @@ class WappstoRequest extends Request {
 
 module.exports = WappstoRequest;
 
-},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}],46:[function(require,module,exports){
+},{"../models/generic-collection":4,"../models/request":8,"../models/stream":11}],45:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -3879,9 +3911,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],47:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 
-},{}],48:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -5660,7 +5692,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":46,"ieee754":53}],49:[function(require,module,exports){
+},{"base64-js":45,"ieee754":52}],48:[function(require,module,exports){
 module.exports = {
   "100": "Continue",
   "101": "Switching Protocols",
@@ -5726,7 +5758,7 @@ module.exports = {
   "511": "Network Authentication Required"
 }
 
-},{}],50:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -5837,7 +5869,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":55}],51:[function(require,module,exports){
+},{"../../is-buffer/index.js":54}],50:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -6362,7 +6394,7 @@ function functionBindPolyfill(context) {
   };
 }
 
-},{}],52:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 var http = require('http')
 var url = require('url')
 
@@ -6395,7 +6427,7 @@ function validateParams (params) {
   return params
 }
 
-},{"http":74,"url":80}],53:[function(require,module,exports){
+},{"http":73,"url":79}],52:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = (nBytes * 8) - mLen - 1
@@ -6481,7 +6513,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],54:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -6506,16 +6538,37 @@ if (typeof Object.create === 'function') {
   }
 }
 
+},{}],54:[function(require,module,exports){
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+// The _isBuffer check is for Safari 5-7 support, because it's missing
+// Object.prototype.constructor. Remove this eventually
+module.exports = function (obj) {
+  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
+}
+
+function isBuffer (obj) {
+  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+// For Node v0.10 support. Remove this eventually.
+function isSlowBuffer (obj) {
+  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
+}
+
 },{}],55:[function(require,module,exports){
-arguments[4][38][0].apply(exports,arguments)
-},{"dup":38}],56:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],57:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -6563,7 +6616,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 
 }).call(this,require('_process'))
-},{"_process":58}],58:[function(require,module,exports){
+},{"_process":57}],57:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -6749,7 +6802,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],59:[function(require,module,exports){
+},{}],58:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/punycode v1.4.1 by @mathias */
 ;(function(root) {
@@ -7286,7 +7339,7 @@ process.umask = function() { return 0; };
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],60:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7372,7 +7425,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],61:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7459,13 +7512,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],62:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":60,"./encode":61}],63:[function(require,module,exports){
+},{"./decode":59,"./encode":60}],62:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7597,7 +7650,7 @@ Duplex.prototype._destroy = function (err, cb) {
 
   pna.nextTick(cb, err);
 };
-},{"./_stream_readable":65,"./_stream_writable":67,"core-util-is":50,"inherits":54,"process-nextick-args":57}],64:[function(require,module,exports){
+},{"./_stream_readable":64,"./_stream_writable":66,"core-util-is":49,"inherits":53,"process-nextick-args":56}],63:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -7645,7 +7698,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":66,"core-util-is":50,"inherits":54}],65:[function(require,module,exports){
+},{"./_stream_transform":65,"core-util-is":49,"inherits":53}],64:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -8667,7 +8720,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":63,"./internal/streams/BufferList":68,"./internal/streams/destroy":69,"./internal/streams/stream":70,"_process":58,"core-util-is":50,"events":51,"inherits":54,"isarray":56,"process-nextick-args":57,"safe-buffer":73,"string_decoder/":71,"util":47}],66:[function(require,module,exports){
+},{"./_stream_duplex":62,"./internal/streams/BufferList":67,"./internal/streams/destroy":68,"./internal/streams/stream":69,"_process":57,"core-util-is":49,"events":50,"inherits":53,"isarray":55,"process-nextick-args":56,"safe-buffer":72,"string_decoder/":70,"util":46}],65:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -8882,7 +8935,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":63,"core-util-is":50,"inherits":54}],67:[function(require,module,exports){
+},{"./_stream_duplex":62,"core-util-is":49,"inherits":53}],66:[function(require,module,exports){
 (function (process,global,setImmediate){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -9572,7 +9625,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("timers").setImmediate)
-},{"./_stream_duplex":63,"./internal/streams/destroy":69,"./internal/streams/stream":70,"_process":58,"core-util-is":50,"inherits":54,"process-nextick-args":57,"safe-buffer":73,"timers":78,"util-deprecate":82}],68:[function(require,module,exports){
+},{"./_stream_duplex":62,"./internal/streams/destroy":68,"./internal/streams/stream":69,"_process":57,"core-util-is":49,"inherits":53,"process-nextick-args":56,"safe-buffer":72,"timers":77,"util-deprecate":81}],67:[function(require,module,exports){
 'use strict';
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -9652,7 +9705,7 @@ if (util && util.inspect && util.inspect.custom) {
     return this.constructor.name + ' ' + obj;
   };
 }
-},{"safe-buffer":73,"util":47}],69:[function(require,module,exports){
+},{"safe-buffer":72,"util":46}],68:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -9727,10 +9780,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":57}],70:[function(require,module,exports){
+},{"process-nextick-args":56}],69:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":51}],71:[function(require,module,exports){
+},{"events":50}],70:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -10027,7 +10080,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":73}],72:[function(require,module,exports){
+},{"safe-buffer":72}],71:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -10036,7 +10089,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":63,"./lib/_stream_passthrough.js":64,"./lib/_stream_readable.js":65,"./lib/_stream_transform.js":66,"./lib/_stream_writable.js":67}],73:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":62,"./lib/_stream_passthrough.js":63,"./lib/_stream_readable.js":64,"./lib/_stream_transform.js":65,"./lib/_stream_writable.js":66}],72:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -10100,7 +10153,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":48}],74:[function(require,module,exports){
+},{"buffer":47}],73:[function(require,module,exports){
 (function (global){
 var ClientRequest = require('./lib/request')
 var response = require('./lib/response')
@@ -10188,7 +10241,7 @@ http.METHODS = [
 	'UNSUBSCRIBE'
 ]
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./lib/request":76,"./lib/response":77,"builtin-status-codes":49,"url":80,"xtend":83}],75:[function(require,module,exports){
+},{"./lib/request":75,"./lib/response":76,"builtin-status-codes":48,"url":79,"xtend":82}],74:[function(require,module,exports){
 (function (global){
 exports.fetch = isFunction(global.fetch) && isFunction(global.ReadableStream)
 
@@ -10265,7 +10318,7 @@ function isFunction (value) {
 xhr = null // Help gc
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],76:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 (function (process,global,Buffer){
 var capability = require('./capability')
 var inherits = require('inherits')
@@ -10596,7 +10649,7 @@ var unsafeHeaders = [
 ]
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./capability":75,"./response":77,"_process":58,"buffer":48,"inherits":54,"readable-stream":72,"to-arraybuffer":79}],77:[function(require,module,exports){
+},{"./capability":74,"./response":76,"_process":57,"buffer":47,"inherits":53,"readable-stream":71,"to-arraybuffer":78}],76:[function(require,module,exports){
 (function (process,global,Buffer){
 var capability = require('./capability')
 var inherits = require('inherits')
@@ -10824,7 +10877,7 @@ IncomingMessage.prototype._onXHRProgress = function () {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./capability":75,"_process":58,"buffer":48,"inherits":54,"readable-stream":72}],78:[function(require,module,exports){
+},{"./capability":74,"_process":57,"buffer":47,"inherits":53,"readable-stream":71}],77:[function(require,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = require('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -10903,7 +10956,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
   delete immediateIds[id];
 };
 }).call(this,require("timers").setImmediate,require("timers").clearImmediate)
-},{"process/browser.js":58,"timers":78}],79:[function(require,module,exports){
+},{"process/browser.js":57,"timers":77}],78:[function(require,module,exports){
 var Buffer = require('buffer').Buffer
 
 module.exports = function (buf) {
@@ -10932,7 +10985,7 @@ module.exports = function (buf) {
 	}
 }
 
-},{"buffer":48}],80:[function(require,module,exports){
+},{"buffer":47}],79:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -11666,7 +11719,7 @@ Url.prototype.parseHost = function() {
   if (host) this.hostname = host;
 };
 
-},{"./util":81,"punycode":59,"querystring":62}],81:[function(require,module,exports){
+},{"./util":80,"punycode":58,"querystring":61}],80:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -11684,7 +11737,7 @@ module.exports = {
   }
 };
 
-},{}],82:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 (function (global){
 
 /**
@@ -11755,7 +11808,7 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],83:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -11776,4 +11829,4 @@ function extend() {
     return target
 }
 
-},{}]},{},[44]);
+},{}]},{},[43]);

@@ -62,6 +62,21 @@ module.exports = {
       define(newUtil, "version", util.version || this.version);
       define(newUtil, "baseUrl", util.baseUrl || this.baseUrl);
       define(newUtil, "token", util.token || token);
+      define(newUtil, "serviceVersion", util.serviceVersion || {});
+      define(newUtil, "getServiceVersion", function (service) {
+        if (service && this.serviceVersion) {
+          if (this.serviceVersion.hasOwnProperty(service)) {
+            return this.serviceVersion[service];
+          } else {
+            return this.serviceVersion.default;
+          }
+        }
+        return undefined;
+      });
+      define(newUtil, "getServiceUrl", function(service, options){
+        const version = options && options.hasOwnProperty('version') ? options.version : this.getServiceVersion(service);
+        return this.baseUrl + (version ? '/' + version : '') + '/' + service;
+      });
       return newUtil;
     },
     throw: function(response){

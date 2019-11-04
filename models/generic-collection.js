@@ -322,15 +322,22 @@ class Collection extends EventEmitter {
         return this.models[index];
     }
 
-    url() {
-        let url = this.parent() ? this.parent().url() : this.util.baseUrl;
+    url(options) {
         if(!this[_className] && this[_class]){
             let instance = new this[_class];
             this[_className] = instance.constructor.name.charAt(0).toLowerCase() + instance.constructor.name.slice(1)
         }
-        if (this[_className]) {
-            url += "/" + this[_className];
+
+        let url = '';
+        if(this.parent()){
+          url = this.parent.url(options);
+          if (this[_className]) {
+              url += "/" + this[_className];
+          }
+        } else if(this[_className]){
+          url = this.util.getServiceUrl(this[_className], options);
         }
+
         return url;
     }
 

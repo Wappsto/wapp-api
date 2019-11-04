@@ -12,6 +12,7 @@ const _Stream = Symbol("Stream");
 const _class = "defaultModel";
 const _className = Symbol.for("generic-collection-className");
 const _requestInstance = "_requestInstance";
+const _name = Symbol.for("generic-class-name");
 
 class Wappsto {
   constructor(request) {
@@ -54,7 +55,8 @@ class Wappsto {
           method: "GET"
         }
       }
-      options.url = this.util.baseUrl + options.url;
+      const service = options.url.split('/')[0];
+      options.url = this.util.getServiceUrl(service) + options.url;
     }
     return this._sendAndHandle(options);
   }
@@ -62,7 +64,7 @@ class Wappsto {
   sendExtsync(options){
     if(options.generateUrl !== false){
       options = Object.assign({}, options);
-      let url = this.util.baseUrl + '/extsync';
+      let url = this.util.getServiceUrl('extsync', options);
       if(options.type === "request"){
         url += '/request';
       } else if(options.type === "response"){
@@ -149,7 +151,7 @@ class Wappsto {
       }
 
       let requestOptions = Object.assign({}, options, {
-        url: this.util.baseUrl + "/" + searchIn + "?" + data
+        url: this.util.getServiceUrl(searchIn, options) + "?" + data
       });
       return collection.fetch(requestOptions);
   }
@@ -191,7 +193,7 @@ class Wappsto {
       let paths = [];
       streamJSON.forEach((obj) => {
         if(obj instanceof this.models.Model){
-          let url = model.url({ full: false }).replace(model.util.baseUrl, "");
+          let url = model.url().replace(model.util.getServiceUrl(model[_name]), "");
           paths.push(url);
           models.push(obj);
         } else if(obj.constructor === Object){
@@ -211,44 +213,50 @@ class Wappsto {
       }
     }
     return new Promise((resolve, reject) => {
-      this.get('stream', searchFor, {
-        expand: 1,
-        success: (streamCollection) => {
-          if (streamCollection.length > 0) {
-            if (!streamJSON.hasOwnProperty('full')) {
-                streamJSON.full = true;
-            }
-            let stream = streamCollection.first();
+      const streamServiceVersion = this.util.getServiceVersion('stream');
+      if (!streamJSON.hasOwnProperty('full')) {
+          streamJSON.full = true;
+      }
+      if(streamServiceVersion){
+        let stream = new this.models.Stream(streamJSON);
+        this._startStream(stream, models, options, resolve);
+      } else {
+        this.get('stream', searchFor, {
+          expand: 1,
+          success: (streamCollection) => {
+            if (streamCollection.length > 0) {
+              let stream = streamCollection.first();
 
-            // merging with json
-            let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
+              // merging with json
+              let newJSON = this._mergeStreams(stream.toJSON(), streamJSON);
 
-            if(newJSON){
-              stream.save(newJSON, {
-                patch: true,
-                success: () => {
-                  this._startStream(stream, models, options);
-                },
-                error: (model, response) => {
-                  reject(response);
-                }
-              });
+              if(newJSON){
+                stream.save(newJSON, {
+                  patch: true,
+                  success: () => {
+                    this._startStream(stream, models, options);
+                  },
+                  error: (model, response) => {
+                    reject(response);
+                  }
+                });
+              } else {
+                this._startStream(stream, models, options, resolve);
+              }
             } else {
-              this._startStream(stream, models, options, resolve);
+              this._createStream(streamJSON, models, options, resolve, reject);
             }
-          } else {
-            this._createStream(streamJSON, models, options, resolve, reject);
+          },
+          error: (model, response) => {
+            reject(response);
           }
-        },
-        error: (model, response) => {
-          reject(response);
-        }
-      });
+        });
+      }
     }).catch((error) => {
       if(!options.error || options.error.constructor !== Function){
-        throw response;
+        throw error;
       } else {
-        options.error(response);
+        options.error(error);
       }
     })
   }
@@ -292,7 +300,7 @@ class Wappsto {
 
   _startStream(stream, models, options, resolve){
     let wStream = new this.Stream(stream);
-    wStream.open();
+    wStream.open(options);
     if(options.subscribe === true){
       wStream.subscribe(models);
     }
