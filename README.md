@@ -145,6 +145,7 @@ It's optional to pass an object with the following keys to the constructor:
 * `session` (String): Set custom installation session.
 * `token` (String): An installation token associated with [extsync](#extsync) requests.
 * `version` (String): Set a default version of documents.
+* `serviceVersion` (Object): Set a version of service. Use default key to set default version for all services. Ex: ```{ default: '2.0', network: '', stream: '2.1' }```.
 
 In `wappsto.util` object you can access these options.
 
