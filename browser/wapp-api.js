@@ -2894,9 +2894,9 @@ class WappstoStream extends EventEmitter {
         this.open(options);
         const newSocket = this.socket;
         newSocket.addEventListener('open', function(e) {
-            this.emit('change:socket', this.socket, oldSocket);
-            oldSocket.ignoreReconnect = true;
-            oldSocket.close();
+            this.emit('change:socket', this.socket, this[_oldSocket]);
+            this[_oldSocket].ignoreReconnect = true;
+            this[_oldSocket].close();
             this[_oldSocket] = null;
         }, false);
         return true;
