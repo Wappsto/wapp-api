@@ -113,16 +113,21 @@ class WappstoStream extends EventEmitter {
                 self.emit('message', e);
                 return;
             }
+            if(message.constructor !== Array){
+              message = [message];
+            }
             self.emit('message', e);
             message.forEach((msg) => {
                 if(msg.meta_object.type === 'extsync'){
-                    if(msg.extsync.uri !== 'extsync/wappsto/editor/console'){
-                        self.emit('extsync', msg.extsync);
+                    const newData = msg.extsync || msg.data;
+                    if(newData.uri !== 'extsync/wappsto/editor/console'){
+                        self.emit('extsync', newData);
                     }
                     return;
                 }
                 if(msg.meta_object.type === 'extsync_request'){
-                    self.emit('extsync_request', msg.extsync_request);
+                    const newData = msg.extsync_request || msg.data;
+                    self.emit('extsync_request', newData);
                     return;
                 }
                 let traceId = self._checkAndSendTrace(msg);
@@ -194,7 +199,7 @@ class WappstoStream extends EventEmitter {
                         if (models) {
                           let type = message.meta_object.type;
                           models.forEach((model) => {
-                            let newModel = model.get(type).add(message[type], options);
+                            let newModel = model.get(type).add(message[type] || message.data, options);
                             this.addModel(newModel);
                           });
                         }
@@ -223,8 +228,8 @@ class WappstoStream extends EventEmitter {
         let models = this.models[id];
         if (models) {
             models.forEach((model) => {
-              model.emit('stream:message', model, message[message.meta_object.type], message);
-              model.set(message[message.meta_object.type], options);
+              model.emit('stream:message', model, message[message.meta_object.type] || message.data, message);
+              model.set(message[message.meta_object.type] || message.data, options);
             });
             return true;
         }
