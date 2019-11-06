@@ -12,6 +12,7 @@ const _source = Symbol('source');
 const _util = Symbol.for('generic-util');
 const _relations = '_relations';
 const _name = Symbol.for('generic-class-name');
+const _oldSocket = Symbol('oldSocket');
 
 class WappstoStream extends EventEmitter {
     constructor(stream) {
@@ -41,27 +42,25 @@ class WappstoStream extends EventEmitter {
     open(options) {
         if (WebSocket && this.stream) {
             const customOptions = Object.assign({}, options);
-            if(!this.stream.get('meta.id')){
-              const newMeta = this.stream.get('meta') || {};
-              newMeta.id = 'open';
-              this.stream.set('meta', newMeta);
-            }
-            let url = this.stream.url(customOptions) + '?x-session=' + this.stream.util.session;
+            let url = this.stream.url(customOptions);
             if (!url.startsWith('http') && window && window.location && window.location.origin) {
                 url = window.location.origin + url;
             }
             url = url.replace(/^http/, 'ws');
             if(customOptions.endPoint){
-              url = url.replace('stream', customOptions.endPoint);
+                url = url.replace('stream', customOptions.endPoint);
             } else if(this.stream.util.getServiceVersion('stream')){
-              url = url.replace('stream', 'websocket');
+                url = url.replace('stream', 'websocket');
             }
-            if(this.stream.get('meta.id') === 'open'){
-              const streamClone = this.stream.toJSON();
-              delete streamClone.meta;
-              delete streamClone.name;
-              url += '&' + querystring.stringify(streamClone);
+            if(!this.stream.get('meta.id')){
+                const streamClone = this.stream.toJSON();
+                delete streamClone.meta;
+                delete streamClone.name;
+                url += '/open?' + querystring.stringify(streamClone) + '&';
+            } else {
+                url += '?';
             }
+            url += 'x-session=' + this.stream.util.session;
             let ws = new WebSocket(url);
             this._addEventListeners(ws);
             this[_source] = ws;
@@ -274,7 +273,15 @@ class WappstoStream extends EventEmitter {
                 }
             }
         });
-        if(subscriptions.length === 0) return;
+        if(subscriptions.length === 0) {
+          if(options.success){
+            options.success.call(this);
+          }
+          if(options.complete){
+            options.complete.call(this);
+          }
+          return;
+        }
         subscriptions = this._getUniqueSubscriptions(subscriptions);
         if(this.updating){
           this.nextStream = subscriptions;
@@ -416,6 +423,33 @@ class WappstoStream extends EventEmitter {
 
     _updateSubscriptions(subscription, options) {
         this.stream.set('subscription', subscription);
+        if(this.stream.get('meta.id')){
+          this._updateObjectSubscriptions(subscription, options);
+        } else {
+          this._updateOneTimeStreamSubscriptions(subscription, options);
+        }
+    }
+
+    _updateOneTimeStreamSubscriptions(subscription, options){
+        const self = this;
+        if(!this[_oldSocket]){
+          this[_oldSocket] = this.socket;
+        } else {
+          this.socket.ignoreReconnect = true;
+          this.socket.close();
+        }
+        this.open(options);
+        const newSocket = this.socket;
+        newSocket.addEventListener('open', function(e) {
+            this.emit('change:socket', this.socket, oldSocket);
+            oldSocket.ignoreReconnect = true;
+            oldSocket.close();
+            this[_oldSocket] = null;
+        }, false);
+        return true;
+    }
+
+    _updateObjectSubscriptions(subscription, options){
         return this.stream.save({
             subscription,
             full: true

@@ -217,10 +217,10 @@ class Wappsto {
       if (!streamJSON.hasOwnProperty('full')) {
           streamJSON.full = true;
       }
-      if(streamServiceVersion){
-        let stream = new this.models.Stream(streamJSON);
-        this._startStream(stream, models, options, resolve);
-      } else {
+      // if(streamServiceVersion){
+      //   let stream = new this.models.Stream(streamJSON);
+      //   this._startStream(stream, models, options, resolve);
+      // } else {
         this.get('stream', searchFor, {
           expand: 1,
           success: (streamCollection) => {
@@ -251,7 +251,7 @@ class Wappsto {
             reject(response);
           }
         });
-      }
+      // }
     }).catch((error) => {
       if(!options.error || options.error.constructor !== Function){
         throw error;

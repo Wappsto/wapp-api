@@ -58,12 +58,12 @@ class WappstoRequest extends Request {
             resolve(wStream);
             this._makeRequest(context, options, resolveRequest, rejectRequest);
           },
-          error: (context, response) => {
+          error: (response) => {
             this._wStreamPromise = null;
-            reject([context, response]);
+            reject(response);
           }
         });
-      }).catch(([context, response]) => {
+      }).catch((response) => {
         rejectRequest(response);
       });
     }
