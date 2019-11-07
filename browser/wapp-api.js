@@ -11331,7 +11331,7 @@ class WappstoStream extends EventEmitter {
     _getModelUrl(model) {
         return model.url({
             full: false
-        }).replace(model.util.getServiceUrl(model[_name]), '');
+        }).replace(model.util.getServiceUrl(model[_name]), '/' + model[_name]);
     }
 
     addModel(model) {
