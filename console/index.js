@@ -43,7 +43,7 @@ const start = function(session, customOptions) {
         }, replacer);
 
         const requestOptions = Object.assign({}, options, { data: postData });
-        const req = axios(options);
+        const req = axios(options).catch(function(){});
         return req;
     }
 
