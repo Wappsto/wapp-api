@@ -15,7 +15,7 @@ const start = function(session, customOptions) {
     const version = customOptions && customOptions.version ? customOptions + '/' : '';
     // Extsync request options
     const options = {
-        url: (customOptions.baseUrl || Util.baseUrl) + '/' + version + 'extsync/wappsto/editor/console',
+        url: (customOptions && customOptions.baseUrl || Util.baseUrl) + '/' + version + 'extsync/wappsto/editor/console',
         method: 'POST',
         headers: {
             'x-session': sessionID,
@@ -61,7 +61,7 @@ const start = function(session, customOptions) {
         const req = sendExtsync('error', [err.stack]);
         req.finally(function () {
             process.exit(1);
-        }); 
+        });
     });
 };
 
