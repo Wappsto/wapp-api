@@ -1,21 +1,21 @@
 // Saving console functions
-let defaultConsole = Object.assign({}, console);
+const Util = require('../util');
+const axios = require('axios');
 
-var start = function(session, customOptions) {
-    const http = require("http");
+const defaultConsole = Object.assign({}, console);
+
+const start = function(session, customOptions) {
     // Getting token, session and installation Id
-    let sessionID = session || process.env.sessionID;
+    const sessionID = session || Util.session;
     if(!sessionID){
-      console.error("Wappsto console requires sessionID to work");
-      return;
+        console.error('Wappsto console requires sessionID to work');
+        return;
     }
 
     const version = customOptions && customOptions.version ? customOptions + '/' : '';
     // Extsync request options
     const options = {
-        hostname: 'rest-service',
-        port: 80,
-        path: '/services/' + version + 'extsync/wappsto/editor/console',
+        url: (customOptions.baseUrl || Util.baseUrl) + '/' + version + 'extsync/wappsto/editor/console',
         method: 'POST',
         headers: {
             'x-session': sessionID,
@@ -23,40 +23,34 @@ var start = function(session, customOptions) {
         }
     };
 
-    let replacer = function(key, value) {
+    const replacer = function(key, value) {
         if (value === undefined) {
             return 'undefined';
         } else if (value === null) {
             return 'null';
-        } else if (typeof value === "function") {
-            return "function";
+        } else if (typeof value === 'function') {
+            return 'function';
         }
         return value;
     }
 
-    let sendExtsync = function(key, arguments) {
-        let req = http.request(options, function(res) {});
-        req.on('error', (e) => {
-            defaultConsole.error(`problem with request: ${e.message}`);
-        });
-
-        let time = new Date().toISOString();
-        let postData = JSON.stringify({
+    const sendExtsync = function(key, arguments) {
+        const time = new Date().toISOString();
+        const postData = JSON.stringify({
             key,
             arguments,
             time
         }, replacer);
 
-        // Write data to request body
-        req.write(postData);
-        req.end();
+        const requestOptions = Object.assign({}, options, { data: postData });
+        const req = axios(options);
         return req;
     }
 
     // Override console
-    let consoleKeys = Object.keys(console);
+    const consoleKeys = Object.keys(console);
     for (let i = 0; i < consoleKeys.length; i++) {
-        let key = consoleKeys[i];
+        const key = consoleKeys[i];
         console[key] = function() {
             sendExtsync(key, arguments);
             defaultConsole[key].apply(console, arguments);
@@ -64,14 +58,14 @@ var start = function(session, customOptions) {
     }
 
     process.on('uncaughtException', (err) => {
-        let req = sendExtsync('error', [err.stack]);
-        req.on('close', () => {
+        const req = sendExtsync('error', [err.stack]);
+        req.finally(function () {
             process.exit(1);
-        });
+        }); 
     });
 };
 
-var stop = function(){
+const stop = function(){
     Object.assign(console, defaultConsole);
 }
 

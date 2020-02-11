@@ -39,6 +39,7 @@ function define(obj, prop, value){
 
 module.exports = {
     baseUrl: baseUrl,
+    session: session,
     version: "2.0",
     type: {
         One: Symbol.for('one'),
