@@ -189,24 +189,26 @@ class WappstoStream extends EventEmitter {
         switch (event) {
             case 'create':
                 if (message.meta_object.type === 'notification') {
-                    this._handleNotification(message.notification, options);
-                } else {
-                    if(!this._updateModel(message, options)){
-                        id = message.path.split('/');
-                        let last = id[id.length - 1];
-                        id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
-                        models = this.models[id];
-                        if (models) {
-                          let type = message.meta_object.type;
-                          models.forEach((model) => {
-                            let newModel = model.get(type).add(message[type] || message.data, options);
-                            this.addModel(newModel);
-                          });
-                        }
+                    this._handleNotification(message.notification || message.data, options);
+                }
+                if(!this._updateModel(message, options)){
+                    id = message.path.split('/');
+                    let last = id[id.length - 1];
+                    id = (Util.isUUID(last) || !last) ? id[id.length - 3] : id[id.length - 2];
+                    models = this.models[id];
+                    if (models) {
+                      let type = message.meta_object.type;
+                      models.forEach((model) => {
+                        let newModel = model.get(type).add(message[type] || message.data, options);
+                        this.addModel(newModel);
+                      });
                     }
                 }
                 break;
             case 'update':
+                if (message.meta_object.type === 'notification') {
+                    this._handleNotification(message.notification || message.data, options);
+                }
                 this._updateModel(message, options);
                 break;
             case 'delete':
