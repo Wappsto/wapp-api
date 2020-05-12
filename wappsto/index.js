@@ -234,7 +234,7 @@ class Wappsto {
                 stream.save(newJSON, {
                   patch: true,
                   success: () => {
-                    this._startStream(stream, models, options);
+                    this._startStream(stream, models, options, resolve);
                   },
                   error: (model, response) => {
                     reject(response);
