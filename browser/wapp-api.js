@@ -460,11 +460,6 @@ class Collection extends EventEmitter {
               }
               id = element.meta && element.meta.id
             } else if(element.constructor === String){
-              element = {
-                meta: {
-                  id: element
-                }
-              };
               id = element;
             } else if(element.constructor === Array){
               return;
@@ -11433,9 +11428,11 @@ class WappstoStream extends EventEmitter {
         const newSocket = this.socket;
         newSocket.addEventListener('open', function(e) {
             this.emit('change:socket', this.socket, this[_oldSocket]);
-            this[_oldSocket].ignoreReconnect = true;
-            this[_oldSocket].close();
-            this[_oldSocket] = null;
+            if(this[_oldSocket]){
+              this[_oldSocket].ignoreReconnect = true;
+              this[_oldSocket].close();
+              this[_oldSocket] = null;
+            }
         }, false);
         return true;
     }
@@ -12095,7 +12092,7 @@ class Wappsto {
                 stream.save(newJSON, {
                   patch: true,
                   success: () => {
-                    this._startStream(stream, models, options);
+                    this._startStream(stream, models, options, resolve);
                   },
                   error: (model, response) => {
                     reject(response);

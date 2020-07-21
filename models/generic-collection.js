@@ -75,11 +75,6 @@ class Collection extends EventEmitter {
               }
               id = element.meta && element.meta.id
             } else if(element.constructor === String){
-              element = {
-                meta: {
-                  id: element
-                }
-              };
               id = element;
             } else if(element.constructor === Array){
               return;
