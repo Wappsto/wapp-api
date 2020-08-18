@@ -14,6 +14,9 @@ const _relations = '_relations';
 const _name = Symbol.for('generic-class-name');
 const _oldSocket = Symbol('oldSocket');
 
+// 25s is the default server ping interval, 1s is to have same delay:
+const PING_TIME_INTERVAL = 25000 + 1000;
+
 class WappstoStream extends EventEmitter {
     constructor(stream) {
         super();
@@ -61,6 +64,7 @@ class WappstoStream extends EventEmitter {
                 url += '?';
             }
             url += 'x-session=' + this.stream.util.session;
+
             let ws = new WebSocket(url);
             this._addEventListeners(ws);
             this[_source] = ws;
@@ -72,7 +76,13 @@ class WappstoStream extends EventEmitter {
     close() {
         if (this[_source]) {
             this[_source].ignoreReconnect = true;
-            this[_source].close();
+            if (this[_source].terminate) {
+                console.log("[WS_DEBUG] CALLING 'terminate()' ON WS");
+                this[_source].terminate();
+            } else {
+                console.log("[WS_DEBUG] CALLING 'close()' ON WS");
+                this[_source].close();
+            }
             this[_source] = null;
         }
     }
@@ -91,12 +101,13 @@ class WappstoStream extends EventEmitter {
         }, 5000);
 
         let pingTiemout;
-        let refreshPingTimer = function(){
+        let refreshPingTimer = function() {
             clearTimeout(pingTiemout);
             pingTiemout = setTimeout(() => {
-              console.log('connection lost, trying to reconnect to: ' + url);
-              self._reconnect();
-            }, 40000);
+                console.log("[WS_DEBUG] COULDN'T GET SERVER PING AFTER "+PING_TIME_INTERVAL);
+                console.log('connection lost, trying to reconnect to: ' + url);
+                self._reconnect();
+            }, PING_TIME_INTERVAL);
         }
 
         let reconnect = () => {
@@ -167,6 +178,7 @@ class WappstoStream extends EventEmitter {
         }, false);
 
         source.addEventListener('ping', function(e) {
+            console.log('[WS_DEBUG] RECEIVED SERVER PING:', e.toString());
             refreshPingTimer();
         });
     }
@@ -449,11 +461,9 @@ class WappstoStream extends EventEmitter {
         const newSocket = this.socket;
         newSocket.addEventListener('open', function(e) {
             this.emit('change:socket', this.socket, this[_oldSocket]);
-            if(this[_oldSocket]){
-              this[_oldSocket].ignoreReconnect = true;
-              this[_oldSocket].close();
-              this[_oldSocket] = null;
-            }
+            this[_oldSocket].ignoreReconnect = true;
+            this[_oldSocket].close();
+            this[_oldSocket] = null;
         }, false);
         return true;
     }
