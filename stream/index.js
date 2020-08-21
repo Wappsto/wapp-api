@@ -43,6 +43,7 @@ class WappstoStream extends EventEmitter {
     }
 
     open(options) {
+        console.log('[WS_DEBUG] STARTING A WEBSOCKET');
         if (WebSocket && this.stream) {
             const customOptions = Object.assign({}, options);
             let url = this.stream.url(customOptions);
@@ -117,6 +118,7 @@ class WappstoStream extends EventEmitter {
         }
 
         source.addEventListener('message', function(e) {
+            console.log('[WS_DEBUG] RECEIVED A MESSAGE FROM THE SERVER:', e.data);
             let message;
             try {
                 message = JSON.parse(e.data);
