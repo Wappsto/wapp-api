@@ -11099,14 +11099,11 @@ class WappstoStream extends EventEmitter {
             message.forEach((msg) => {
                 if(msg.meta_object.type === 'extsync'){
                     const newData = msg.extsync || msg.data;
-                    if(newData.uri !== 'extsync/wappsto/editor/console'){
+                    if(newData.request){
+                        self.emit('extsync_request', newData);
+                    } else if(newData.uri !== 'extsync/wappsto/editor/console'){
                         self.emit('extsync', newData);
                     }
-                    return;
-                }
-                if(msg.meta_object.type === 'extsync_request'){
-                    const newData = msg.extsync_request || msg.data;
-                    self.emit('extsync_request', newData);
                     return;
                 }
                 let traceId = self._checkAndSendTrace(msg);
