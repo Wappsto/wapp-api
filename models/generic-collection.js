@@ -67,24 +67,22 @@ class Collection extends EventEmitter {
             isArray = false;
         }
         data.forEach((element, index) => {
-            let id, lookFor;
+            let obj, lookFor;
             if(element.constructor === Object){
               if(this.models.includes(element)){
                   results.push(element);
                   return;
               }
-              id = element.meta && element.meta.id
+              lookFor = element;
+              obj = lookFor;
             } else if(element.constructor === String){
-              id = element;
+              lookFor = { meta: { id: element }};
+              obj = lookFor;
             } else if(element.constructor === Array){
               return;
             } else {
-              id = element.get("meta.id");
-            }
-            if(id){
-              lookFor = { meta: { id: id }};
-            } else {
-              lookFor = element
+              lookFor = { meta: { id: element.get("meta.id") }};
+              obj = element;
             }
             let found = this.find(lookFor, options);
             if (found) {
@@ -95,7 +93,7 @@ class Collection extends EventEmitter {
                 }
                 results.push(found);
             } else if (this[_class] && !(element instanceof Generic)) {
-                let newInstance = new this[_class](element, this[_requestInstance]);
+                let newInstance = new this[_class](obj, this[_requestInstance]);
                 newInstance[_collections].push(this);
                 this._pushToModels(newInstance, options);
                 results.push(newInstance);
