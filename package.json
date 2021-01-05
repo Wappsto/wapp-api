@@ -27,7 +27,7 @@
     "prepublish": "browserify wappsto/index.js -o browser/wapp-api.js"
   },
   "dependencies": {
-    "axios": "^0.18.0",
+    "axios": "^0.21.1",
     "querystring": "^0.2.0",
     "ws": "^6.1.2"
   },
