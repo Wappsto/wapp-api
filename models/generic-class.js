@@ -63,10 +63,12 @@ class Generic extends EventEmitter {
 
     _propagateEventDown(){
         this.constructor[_relations].forEach(({ key, type, relatedClass }) => {
-            if (type === Util.type.One) {
-                this.get(key).emit("destroy", this.get(key));
-            } else if (type === Util.type.Many) {
-                this.get(key)._propagateEventDown("destroy");
+            if(this.get(key)){
+                if (type === Util.type.One) {
+                    this.get(key).emit("destroy", this.get(key));
+                } else if (type === Util.type.Many) {
+                    this.get(key)._propagateEventDown("destroy");
+                }
             }
         });
         this.removeListener("destroy", this._propagateEventDown);
