@@ -139,10 +139,12 @@ class Generic extends EventEmitter {
                         return element["key"] === key;
                     });
                     if (relation) {
-                        if (relation.type === Util.type.One) {
-                            this.get(key).set(data[key]);
-                        } else if (relation.type === Util.type.Many) {
-                            this.get(key).push(data[key], options);
+                        if(this.get(key)){
+                            if (relation.type === Util.type.One) {
+                                this.get(key).set(data[key]);
+                            } else if (relation.type === Util.type.Many) {
+                                this.get(key).push(data[key], options);
+                            }
                         }
                     } else {
                         event = this._set(key, data[key], options);
