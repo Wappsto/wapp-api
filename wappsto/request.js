@@ -120,7 +120,7 @@ class WappstoRequest extends Request {
   }
 
   _handleError(context, options, response, resolve, reject){
-    if(response.response.data && response.response.data.code && [400013, 400008].indexOf(response.response.data.code) !== -1){
+    if(response.response && response.response.data && response.response.data.code && [400013, 400008].indexOf(response.response.data.code) !== -1){
         callStatusChange.call(context, options, STATUS.WAITING);
         this._waitFor.installation = [...(this._waitFor.installation || []), {context: context, options: options, resolve: resolve, reject: reject}];
     } else {
