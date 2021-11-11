@@ -1,6 +1,6 @@
 {
   "name": "wapp-api",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Helper functions to speed up wapp development process.",
   "main": "wappsto/index.js",
   "license": "Apache-2.0",
