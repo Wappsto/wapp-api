@@ -1,4 +1,5 @@
-# wapp-api
+# DEPRECATED - wapp-api
+Please migrate to using https://github.com/Wappsto/javascript-wappsto-wapp
 
 It is a set of helpful JavaScript classes and functions that will speed up the wapp development process.
 
